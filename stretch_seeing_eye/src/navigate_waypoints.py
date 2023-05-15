@@ -1,19 +1,30 @@
 import rospy
+import math
 
-from std_msgs.msg import Header
+from std_msgs.msg import Header, String
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from actionlib_msgs.msg import GoalStatusArray
 from dynamic_reconfigure import client
+from visualization_msgs.msg import Marker
+from std_msgs.msg import ColorRGBA
+
+from stretch_seeing_eye.shortest_path import Graph
 
 class NavigateWaypoint:
     def __init__(self):
         # Publishers and Subscribers
         self.move_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
-        self.sub = rospy.Subscriber('/move_base/status', GoalStatusArray, self.move_base_status_callback, queue_size=1)
-        self.client = client.Client('/move_base/TrajectoryPlannerROS', timeout=30, config_callback=None)
+        self.waypoint_rviz_pub = rospy.Publisher('/visualization_marker', Marker, queue_size=10)
+        self.move_base_sub = rospy.Subscriber('/move_base/status', GoalStatusArray, self.move_base_status_callback, queue_size=1)
+        self.command_sub = rospy.Subscriber('/stretch_seeing_eye/command', String, self.command_callback, queue_size=1)
+        self.set_curr_waypoint_sub = rospy.Subscriber('/stretch_seeing_eye/set_curr_waypoint', String, self.set_curr_waypoint_callback, queue_size=1)
+        self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
+        rospy.sleep(1)
 
         self.moving = False
         self.waypoints = {}
+        self.lookup_table = {}
+        self.lookup_table_reverse = {}
         self.curr_waypoint = 'Base'
         self.import_data(rospy.get_param('/waypoints_file'))
 
@@ -24,13 +35,37 @@ class NavigateWaypoint:
             self.moving = False
         # rospy.logdebug('Moving: ' + str(self.moving))
     
+    def command_callback(self, msg: String):
+        self.navigate_to_waypoint(msg.data)
+    
+    def set_curr_waypoint_callback(self, msg: String):
+        self.curr_waypoint = msg.data
+    
     def import_data(self, file: str):
+        connections = {}
+        count = 0
         with open(file, 'r') as f:
             data = f.readlines()
             for line in data:
                 line = line.split(',')
                 self.waypoints[line[0]] = PoseStamped(header=Header(frame_id='map'), pose=Pose(Point(float(line[1]), float(line[2]), float(line[3])), Quaternion(float(line[4]), float(line[5]), float(line[6]), float(line[7]))))
-                # rospy.loginfo(self.waypoints[line[0]])
+                self.waypoint_rviz_pub.publish(self.create_marker(self.waypoints[line[0]].pose.position, self.waypoints[line[0]].pose.orientation, count))
+                waypoint_connections = []
+                for i in range(8, len(line)):
+                    waypoint_connections.append(line[i].strip())
+                connections[line[0]] = waypoint_connections
+                self.lookup_table[line[0]] = count
+                self.lookup_table_reverse[count] = line[0]
+                count += 1
+        rows, cols = count, count
+        adjacency_matrix = [[0 for i in range(cols)] for j in range(rows)]
+        for key, val in connections.items():
+            curr_waypoint = self.waypoints[key].pose.position
+            for connection in val:
+                connection_waypoint = self.waypoints[connection].pose.position
+                adjacency_matrix[self.lookup_table[key]][self.lookup_table[connection]] = math.sqrt((curr_waypoint.x - connection_waypoint.x)**2 + (curr_waypoint.y - connection_waypoint.y)**2)
+        self.graph = Graph(count)
+        self.graph.graph = adjacency_matrix
 
     def navigate(self, waypoint: str = 'Base'):
         rospy.logdebug('Navigating to ' + waypoint)
@@ -39,13 +74,36 @@ class NavigateWaypoint:
         self.move_pub.publish(self.waypoints[waypoint])
         rospy.logdebug('Published')
 
-    def navigate_waypoints(self, waypoints: list = []):
-        for waypoint in waypoints:
+    def navigate_to_waypoint(self, waypoint: str = 'Base'):
+        waypoints = list(map(lambda x: self.lookup_table_reverse[x], self.graph.dijkstra(self.lookup_table[self.curr_waypoint], self.lookup_table[waypoint])))
+        waypoints.append(waypoint)
+        waypoints = waypoints[1:]
+        rospy.logdebug(waypoints)
+        self.set_navigation_tolerance(2 * math.pi)
+        for i, waypoint in enumerate(waypoints):
+            if i == len(waypoints) - 1:
+                self.set_navigation_tolerance(0.1)
             self.navigate(waypoint)
             self.curr_waypoint = waypoint
             rospy.sleep(1)
             while self.moving:
                 rospy.sleep(1)
+        self.curr_waypoint = waypoint
+    
+    def set_navigation_tolerance(self, tolerance: float = 0.1):
+        self.client.update_configuration({'yaw_goal_tolerance': tolerance})
+    
+    def create_marker(self, p: Point, q: Quaternion, count: int):
+        m = Marker()
+        m.header.frame_id = 'map'
+        m.ns = 'test'
+        m.id = count
+        m.type = Marker.SPHERE
+        m.action = Marker.ADD
+        m.pose = Pose(p, q)
+        m.scale = Point(0.5, 0.5, 0.5)
+        m.color = ColorRGBA(0.0, 1.0, 0.0, 1.0)
+        return m
 
 
 
@@ -54,6 +112,6 @@ if __name__ == '__main__':
     rospy.init_node('navigate_waypoints', log_level=rospy.DEBUG)
     node = NavigateWaypoint()
     rospy.sleep(1)
-    node.navigate_waypoints(['R1', 'R2', 'M1'])
+    # node.navigate_to_waypoint('M1')
     while not rospy.is_shutdown():
         rospy.spin()
