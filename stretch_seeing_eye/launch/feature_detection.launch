@@ -1,0 +1,5 @@
+<launch>
+    <param name="features_file" type="string" value="$(find stretch_seeing_eye)/config/aws_hospital_wapoints/features.csv" />
+    <node pkg="stretch_seeing_eye" type="publish_plane_node"  name="publish_plane_node" output="screen"/>
+    <node pkg="stretch_seeing_eye" type="detect_feature.py"  name="detect_feature" output="screen"/>
+</launch>
