@@ -60,6 +60,7 @@ catkin_python_setup()
 add_service_files(
   FILES
   Plane.srv
+  Waypoint.srv
 )
 
 ## Generate actions in the 'action' folder

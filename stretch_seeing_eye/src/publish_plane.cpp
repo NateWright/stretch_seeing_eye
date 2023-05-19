@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
     ros::init(argc, argv, "publish_plane");
     ros::NodeHandle nh;
 
-    visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("map", "/rviz_visual_markers"));
+    visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("map", "/visualization_marker_array"));
     visual_tools_->loadMarkerPub();
 
     ros::Duration(1).sleep();
