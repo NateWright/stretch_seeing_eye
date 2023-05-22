@@ -34,7 +34,7 @@ class NavigateWaypoint:
         self.waypoints = {}
         self.lookup_table = {}
         self.lookup_table_reverse = {}
-        self.curr_waypoint = 'Base'
+        self.curr_waypoint = 'base'
         self.curr_goal = None
         self.import_data(rospy.get_param('/waypoints_file'))
 
@@ -73,14 +73,15 @@ class NavigateWaypoint:
             data = f.readlines()
             for line in data:
                 line = line.split(',')
-                self.waypoints[line[0]] = PoseStamped(header=Header(frame_id='map'), pose=Pose(Point(float(line[1]), float(line[2]), float(line[3])), Quaternion(float(line[4]), float(line[5]), float(line[6]), float(line[7]))))
-                markers.markers.append(self.create_marker(self.waypoints[line[0]].pose.position, self.waypoints[line[0]].pose.orientation, count))
+                name = line[0].strip().lower()
+                self.waypoints[name] = PoseStamped(header=Header(frame_id='map'), pose=Pose(Point(float(line[1]), float(line[2]), float(line[3])), Quaternion(float(line[4]), float(line[5]), float(line[6]), float(line[7]))))
+                markers.markers.append(self.create_marker(self.waypoints[name].pose.position, self.waypoints[name].pose.orientation, count))
                 waypoint_connections = []
                 for i in range(8, len(line)):
-                    waypoint_connections.append(line[i].strip())
-                connections[line[0]] = waypoint_connections
-                self.lookup_table[line[0]] = count
-                self.lookup_table_reverse[count] = line[0]
+                    waypoint_connections.append(line[i].strip().lower())
+                connections[name] = waypoint_connections
+                self.lookup_table[name] = count
+                self.lookup_table_reverse[count] = name
                 count += 1
         self.waypoint_rviz_pub.publish(markers)
         rows, cols = count, count
@@ -102,6 +103,9 @@ class NavigateWaypoint:
         rospy.logdebug('Published')
 
     def navigate_to_waypoint(self, msg: WaypointRequest):
+        if msg.data not in self.waypoints.keys():
+            rospy.logdebug('Waypoint unknown')
+            return WaypointResponse()
         waypoints = list(map(lambda x: self.lookup_table_reverse[x], self.graph.dijkstra(self.lookup_table[self.curr_waypoint], self.lookup_table[msg.data])))
         waypoints.append(msg.data)
         waypoints = waypoints[1:]
