@@ -20,8 +20,8 @@ class NavigateWaypoint:
         self.move_base_cancel_pub = rospy.Publisher('/move_base/cancel', GoalID, queue_size=1)
 
         self.move_base_sub = rospy.Subscriber('/move_base/status', GoalStatusArray, self.move_base_status_callback, queue_size=1)
-        self.command_sub = rospy.Subscriber('/stretch_seeing_eye/command', String, self.command_callback, queue_size=1)
-        # self.set_curr_waypoint_sub = rospy.Subscriber('/stretch_seeing_eye/set_curr_waypoint', String, self.set_curr_waypoint_callback, queue_size=1)
+        # self.command_sub = rospy.Subscriber('/stretch_seeing_eye/command', String, self.command_callback, queue_size=1)
+        self.set_curr_waypoint_sub = rospy.Subscriber('/stretch_seeing_eye/set_curr_waypoint', String, self.set_curr_waypoint_callback, queue_size=1)
 
         self.navigate_to_waypoint_service = rospy.Service('/stretch_seeing_eye/navigate_to_waypoint', Waypoint, self.navigate_to_waypoint)
         self.pause_navigation_service = rospy.Service('/stretch_seeing_eye/pause_navigation', SetBool, self.pause_navigation_callback)
