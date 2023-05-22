@@ -167,6 +167,7 @@ catkin_install_python(PROGRAMS
   src/createpoints.py
   src/navigate_waypoints.py
   src/detect_feature.py
+  src/voice_recognition_test.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
