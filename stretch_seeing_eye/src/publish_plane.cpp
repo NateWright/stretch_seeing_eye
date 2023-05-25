@@ -1,21 +1,41 @@
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/Point32.h>
+#include <geometry_msgs/Polygon.h>
 #include <ros/ros.h>
 #include <rviz_visual_tools/rviz_visual_tools.h>
 
-#include "stretch_seeing_eye/Plane.h"
+#include "stretch_seeing_eye/Feature.h"
+
+#define SIZE 0.2
 
 rviz_visual_tools::RvizVisualToolsPtr visual_tools_;
 
-bool publish_plane(stretch_seeing_eye::Plane::Request &req, stretch_seeing_eye::Plane::Response &res) {
+enum rviz_visual_tools::colors COLORS[] = {
+    rviz_visual_tools::YELLOW,
+    rviz_visual_tools::ORANGE,
+    rviz_visual_tools::RED,
+};
+
+bool publish_plane(stretch_seeing_eye::Feature::Request &req, stretch_seeing_eye::Feature::Response &res) {
     ROS_DEBUG("Publishing plane");
-    geometry_msgs::Point p1, p2;
-    p1.x = req.x1;
-    p1.y = req.y1;
-    p1.z = 0;
-    p2.x = req.x2;
-    p2.y = req.y2;
-    p2.z = 0.05;
-    visual_tools_->publishCuboid(p1, p2, rviz_visual_tools::RED);
+
+    if (req.points.size() < 3) {
+        for (auto &point : req.points) {
+            geometry_msgs::Point p1, p2;
+            p1.x = point.x - SIZE;
+            p1.y = point.y - SIZE;
+            p1.z = 0.0;
+            p2.x = point.x + SIZE;
+            p2.y = point.y + SIZE;
+            p2.z = SIZE;
+            visual_tools_->publishCuboid(p1, p2, COLORS[req.detail_level]);
+        }
+    } else {
+        geometry_msgs::Polygon polygon;
+        polygon.points = req.points;
+        visual_tools_->publishPolygon(polygon, rviz_visual_tools::RED);
+    }
+
     visual_tools_->trigger();
 
     return true;
@@ -30,7 +50,7 @@ int main(int argc, char **argv) {
 
     ros::Duration(1).sleep();
 
-    ros::ServiceServer service = nh.advertiseService("/stretch_seeing_eye/create_plane_marker", publish_plane);
+    ros::ServiceServer service = nh.advertiseService("/stretch_seeing_eye/create_marker", publish_plane);
 
     ros::spin();
     return 0;
