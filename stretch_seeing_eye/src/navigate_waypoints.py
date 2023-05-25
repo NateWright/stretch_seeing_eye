@@ -10,7 +10,7 @@ from std_msgs.msg import ColorRGBA
 from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 
 from stretch_seeing_eye.shortest_path import Graph
-from stretch_seeing_eye.srv import Waypoint, WaypointRequest, WaypointResponse
+from stretch_seeing_eye.srv import Waypoint, WaypointRequest, WaypointResponse, GetWaypoints, GetWaypointsRequest, GetWaypointsResponse
 
 class NavigateWaypoint:
     def __init__(self):
@@ -24,9 +24,10 @@ class NavigateWaypoint:
         self.set_curr_waypoint_sub = rospy.Subscriber('/stretch_seeing_eye/set_curr_waypoint', String, self.set_curr_waypoint_callback, queue_size=1)
 
         self.navigate_to_waypoint_service = rospy.Service('/stretch_seeing_eye/navigate_to_waypoint', Waypoint, self.navigate_to_waypoint)
+        self.get_waypoints_service = rospy.Service('/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
         self.pause_navigation_service = rospy.Service('/stretch_seeing_eye/pause_navigation', SetBool, self.pause_navigation_callback)
 
-        # self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
+        self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
 
         self.moving = False
@@ -36,6 +37,7 @@ class NavigateWaypoint:
         self.lookup_table_reverse = {}
         self.curr_waypoint = 'base'
         self.curr_goal = None
+        rospy.logdebug(rospy.get_param('/waypoints_file'))
         self.import_data(rospy.get_param('/waypoints_file'))
 
     def move_base_status_callback(self, msg: GoalStatusArray):
@@ -59,10 +61,10 @@ class NavigateWaypoint:
 
     
     def command_callback(self, msg: String):
-        self.navigate_to_waypoint(msg.data)
+        self.navigate_to_waypoint(msg.data.lower())
     
     def set_curr_waypoint_callback(self, msg: String):
-        self.curr_waypoint = msg.data
+        self.curr_waypoint = msg.data.lower()
     
     def import_data(self, file: str):
         connections = {}
@@ -103,28 +105,29 @@ class NavigateWaypoint:
         rospy.logdebug('Published')
 
     def navigate_to_waypoint(self, msg: WaypointRequest):
-        if msg.data not in self.waypoints.keys():
+        goal = msg.data.lower()
+        if goal not in self.waypoints.keys():
             rospy.logdebug('Waypoint unknown')
             return WaypointResponse()
-        waypoints = list(map(lambda x: self.lookup_table_reverse[x], self.graph.dijkstra(self.lookup_table[self.curr_waypoint], self.lookup_table[msg.data])))
-        waypoints.append(msg.data)
+        waypoints = list(map(lambda x: self.lookup_table_reverse[x], self.graph.dijkstra(self.lookup_table[self.curr_waypoint], self.lookup_table[goal])))
+        waypoints.append(goal)
         waypoints = waypoints[1:]
         rospy.logdebug(waypoints)
-        # self.set_navigation_tolerance(2 * math.pi)
+        self.update_move_base('xy_goal_tolerance', 1.0)
         for i, waypoint in enumerate(waypoints):
-            # if i == len(waypoints) - 1:
-            #     self.set_navigation_tolerance(0.1)
+            if i == len(waypoints) - 1:
+                self.update_move_base('xy_goal_tolerance', 0.1)
             self.navigate(waypoint)
             self.curr_waypoint = waypoint
             rospy.sleep(1)
             while self.moving or self.pause:
                 rospy.sleep(1)
-        self.curr_waypoint = msg.data
-        rospy.logdebug('Reached ' + msg.data)
+        self.curr_waypoint = goal
+        rospy.logdebug('Reached ' + goal)
         return WaypointResponse()
     
-    # def set_navigation_tolerance(self, tolerance: float = 0.1):
-    #     self.client.update_configuration({'yaw_goal_tolerance': tolerance})
+    def update_move_base(self, key: str, value: any):
+        self.client.update_configuration({key: value})
     
     def create_marker(self, p: Point, q: Quaternion, count: int):
         m = Marker()
@@ -137,9 +140,10 @@ class NavigateWaypoint:
         m.scale = Point(0.5, 0.5, 0.5)
         m.color = ColorRGBA(0.0, 1.0, 0.0, 1.0)
         return m
-
-
-
+    
+    def get_waypoints_callback(self, req: GetWaypointsRequest):
+        return GetWaypointsResponse(waypoints=self.waypoints.keys())
+    
 
 if __name__ == '__main__':
     rospy.init_node('navigate_waypoints', log_level=rospy.DEBUG)
