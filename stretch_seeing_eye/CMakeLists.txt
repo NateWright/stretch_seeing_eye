@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   rviz_visual_tools
   rospy
   std_msgs
+  geometry_msgs
   message_generation
 )
 find_package(Eigen3 REQUIRED)
@@ -59,8 +60,9 @@ catkin_python_setup()
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
-  Plane.srv
+  Feature.srv
   Waypoint.srv
+  GetWaypoints.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -74,6 +76,7 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   std_msgs  # Or other packages containing msgs
+  geometry_msgs
 )
 
 ################################################
