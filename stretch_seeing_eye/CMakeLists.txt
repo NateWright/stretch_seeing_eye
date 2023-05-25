@@ -167,7 +167,6 @@ target_link_libraries(publish_plane_node
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
-  src/createpoints.py
   src/navigate_waypoints.py
   src/detect_feature.py
   src/voice_recognition_test.py
