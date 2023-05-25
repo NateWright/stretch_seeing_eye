@@ -1,0 +1,5 @@
+Feature_Detection:
+  detail_level: "HIGH"
+  door_distance: 3.0
+  door_detection_cone: 1.57
+  feature_distance: 0.0

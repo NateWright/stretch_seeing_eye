@@ -28,8 +28,16 @@ class DetectFeature:
         self.tf_buffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tf_buffer)
 
+        self.parameters = {
+            'door_distance': rospy.get_param('detect_feature/Feature_Detection/door_distance2'),
+            'door_detection_cone': rospy.get_param('detect_feature/Feature_Detection/door_detection_cone'),
+            'feature_distance': rospy.get_param('detect_feature/Feature_Detection/feature_distance'),
+        }
+
+        rospy.logdebug(self.parameters)
+
         self.features = {}
-        self.detail_level: DetailLevel = DetailLevel.HIGH
+        self.detail_level: DetailLevel = getattr(DetailLevel, rospy.get_param('detect_feature/Feature_Detection/detail_level'))
         
         self.import_features(rospy.get_param('/features_file'))
 
@@ -81,12 +89,12 @@ class DetectFeature:
                             transform = self.tf_buffer.lookup_transform('base_link', 'map', rospy.Time())
                         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                             continue
-                        if (point.point.x)**2 + (point.point.y)**2 < (3.0)**2 and abs(Math.atan(point.point.y/point.point.x)) < Math.pi/2:
-                            rospy.loginfo('Found feature: {}'.format(key))
+                        if (point.point.x)**2 + (point.point.y)**2 < (self.parameters['door_distance'])**2 and abs(Math.atan(point.point.y/point.point.x)) < self.parameters['door_detection_cone']:
+                            rospy.logdebug('Found feature: {}'.format(key))
                             self.publish_feature.publish(value['Description'])
                             previous_feature = key
                             break
-                    elif len(value['Points']) > 1 and previous_feature != key:
+                    elif len(value['Points']) == 4 and previous_feature != key:
                         try:
                             transform = self.tf_buffer.lookup_transform('map', 'base_link', rospy.Time())
                             # rospy.logdebug(transform)
@@ -94,31 +102,14 @@ class DetectFeature:
                             for point in value['Points']:
                                 points.append(ShapelyPoint(point.x, point.y))
                             polygon = ShapelyPolygon(points)
-                            if polygon.contains(ShapelyPoint(transform.transform.translation.x, transform.transform.translation.y)):
-                                if previous_feature != key:
-                                    rospy.loginfo('Found feature: {}'.format(value))
-                                    self.publish_feature.publish(value['Description'])
-                                    previous_feature = key
+                            if polygon.distance(ShapelyPoint(transform.transform.translation.x, transform.transform.translation.y)) <= self.parameters['feature_distance']:
+                                rospy.logdebug('Found feature: {}'.format(value))
+                                self.publish_feature.publish(value['Description'])
+                                previous_feature = key
                         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                            # rospy.logdebug('No transform found')
+                            rospy.logdebug('No transform found')
                             continue
-
-
-            # for feature in self.features:
-            #     if self.is_in_range(transform.transform.translation, self.features[feature]['P1'], self.features[feature]['P2']):
-            #         if previous_feature != feature:
-            #             rospy.loginfo('Found feature: {}'.format(feature))
-            #             self.publish_feature.publish(feature)
-            #             previous_feature = feature
-            #         break
             rate.sleep()
-
-
-    # def is_in_range(self, position, p1, p2):
-    #     if position.x > p1['x'] and position.x < p2['x'] or position.x > p2['x'] and position.x < p1['x']:
-    #         if position.y > p1['y'] and position.y < p2['y'] or position.y > p2['y'] and position.y < p1['y']:
-    #             return True
-    #     return False
 
 
 if __name__ == '__main__':
