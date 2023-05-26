@@ -8,3 +8,8 @@ roslaunch stretch_seeing_eye navigation_gazebo.launch map_yaml:=/home/nwright/ro
 roslaunch stretch_seeing_eye navigate_waypoints.launch location:=aws_hospital
 roslaunch stretch_seeing_eye feature_detection.launch location:=aws_hospital
 ```
+
+```bash
+roslaunch stretch_seeing_eye navigation.launch location:=gps_room rviz:=false
+rviz -d `rospack find stretch_seeing_eye`/rviz/navigation.rviz
+```
