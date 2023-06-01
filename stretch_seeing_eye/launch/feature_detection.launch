@@ -1,6 +1,6 @@
 <launch>
     <arg name="location"/>
-    <param name="features_file" type="string" value="$(find stretch_seeing_eye)/config/$(arg location)/features.csv" />
+    <param name="description_file" type="string" value="$(find stretch_seeing_eye)/config/$(arg location)/description_data.csv" />
     <node pkg="stretch_seeing_eye" type="publish_plane_node"  name="publish_plane_node" output="screen"/>
     <node pkg="stretch_seeing_eye" type="detect_feature.py"  name="detect_feature" output="screen">
         <rosparam file="$(find stretch_seeing_eye)/config/feature_detection.yaml" command="load" />

@@ -29,7 +29,7 @@ class DetectFeature:
         self.listener = tf2_ros.TransformListener(self.tf_buffer)
 
         self.parameters = {
-            'door_distance': rospy.get_param('detect_feature/Feature_Detection/door_distance2'),
+            'door_distance': rospy.get_param('detect_feature/Feature_Detection/door_distance'),
             'door_detection_cone': rospy.get_param('detect_feature/Feature_Detection/door_detection_cone'),
             'feature_distance': rospy.get_param('detect_feature/Feature_Detection/feature_distance'),
         }
@@ -39,16 +39,15 @@ class DetectFeature:
         self.features = {}
         self.detail_level: DetailLevel = getattr(DetailLevel, rospy.get_param('detect_feature/Feature_Detection/detail_level'))
         
-        self.import_features(rospy.get_param('/features_file'))
+        self.import_features(rospy.get_param('/description_file'))
 
     def import_features(self, file: str):
         self.features = {}
         for key in DetailLevel:
             self.features[key.value] = {}
-            rospy.logdebug(key.value)
 
         with open(file, 'r') as f:
-            data = f.readlines()
+            data = f.read().split('---\n')[1].split('\n')
             for line in data:
                 if line == "":
                     continue

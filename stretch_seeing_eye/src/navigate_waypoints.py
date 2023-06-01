@@ -10,7 +10,9 @@ from std_msgs.msg import ColorRGBA
 from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
 
 from stretch_seeing_eye.shortest_path import Graph
-from stretch_seeing_eye.srv import Waypoint, WaypointRequest, WaypointResponse, GetWaypoints, GetWaypointsRequest, GetWaypointsResponse
+from stretch_seeing_eye.waypoint import Waypoint
+from stretch_seeing_eye.feature import Feature, DetailLevel
+from stretch_seeing_eye.srv import Waypoint as WaypointSrv, WaypointRequest, WaypointResponse, GetWaypoints, GetWaypointsRequest, GetWaypointsResponse
 
 class NavigateWaypoint:
     def __init__(self):
@@ -23,7 +25,7 @@ class NavigateWaypoint:
         # self.command_sub = rospy.Subscriber('/stretch_seeing_eye/command', String, self.command_callback, queue_size=1)
         self.set_curr_waypoint_sub = rospy.Subscriber('/stretch_seeing_eye/set_curr_waypoint', String, self.set_curr_waypoint_callback, queue_size=1)
 
-        self.navigate_to_waypoint_service = rospy.Service('/stretch_seeing_eye/navigate_to_waypoint', Waypoint, self.navigate_to_waypoint)
+        self.navigate_to_waypoint_service = rospy.Service('/stretch_seeing_eye/navigate_to_waypoint', WaypointSrv, self.navigate_to_waypoint)
         self.get_waypoints_service = rospy.Service('/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
         self.pause_navigation_service = rospy.Service('/stretch_seeing_eye/pause_navigation', SetBool, self.pause_navigation_callback)
 
@@ -33,12 +35,13 @@ class NavigateWaypoint:
         self.moving = False
         self.pause = False
         self.waypoints = {}
+        self.features = {}
         self.lookup_table = {}
         self.lookup_table_reverse = {}
-        self.curr_waypoint = 'base'
+        self.curr_feature = 'base'
         self.curr_goal = None
-        rospy.logdebug(rospy.get_param('/waypoints_file'))
-        self.import_data(rospy.get_param('/waypoints_file'))
+        rospy.logdebug(rospy.get_param('/description_file'))
+        self.import_data(rospy.get_param('/description_file'))
 
     def move_base_status_callback(self, msg: GoalStatusArray):
         if len(msg.status_list) and msg.status_list[-1].status == 1:
@@ -64,7 +67,7 @@ class NavigateWaypoint:
         self.navigate_to_waypoint(msg.data.lower())
     
     def set_curr_waypoint_callback(self, msg: String):
-        self.curr_waypoint = msg.data.lower()
+        self.curr_feature = msg.data.lower()
     
     def import_data(self, file: str):
         connections = {}
@@ -72,26 +75,31 @@ class NavigateWaypoint:
 
         markers = MarkerArray(markers=[])
         with open(file, 'r') as f:
-            data = f.readlines()
-            for line in data:
-                line = line.split(',')
-                name = line[0].strip().lower()
-                self.waypoints[name] = PoseStamped(header=Header(frame_id='map'), pose=Pose(Point(float(line[1]), float(line[2]), float(line[3])), Quaternion(float(line[4]), float(line[5]), float(line[6]), float(line[7]))))
-                markers.markers.append(self.create_marker(self.waypoints[name].pose.position, self.waypoints[name].pose.orientation, count))
-                waypoint_connections = []
-                for i in range(8, len(line)):
-                    waypoint_connections.append(line[i].strip().lower())
-                connections[name] = waypoint_connections
-                self.lookup_table[name] = count
-                self.lookup_table_reverse[count] = name
+            data = f.read().split('---\n')
+            for line in data[0].split('\n'):
+                if line == "":
+                    continue
+                w = Waypoint(line)
+                self.waypoints[w.name] = w
+                markers.markers.append(self.create_marker(self.waypoints[w.name].poseStamped.pose.position, self.waypoints[w.name].poseStamped.pose.orientation, count))
+                connections[w.name] = w.connections
+                self.lookup_table[w.name] = count
+                self.lookup_table_reverse[count] = w.name
                 count += 1
+            for line in data[1].split('\n'):
+                if line == "":
+                    continue
+                f = Feature(line.strip())
+                if f.waypoint is not None:
+                    # rospy.logdebug('Feature ' + f.name + ' has waypoint ' + f.waypoint)
+                    self.features[f.name] = f
         self.waypoint_rviz_pub.publish(markers)
         rows, cols = count, count
         adjacency_matrix = [[0 for i in range(cols)] for j in range(rows)]
         for key, val in connections.items():
-            curr_waypoint = self.waypoints[key].pose.position
+            curr_waypoint = self.waypoints[key].poseStamped.pose.position
             for connection in val:
-                connection_waypoint = self.waypoints[connection].pose.position
+                connection_waypoint = self.waypoints[connection].poseStamped.pose.position
                 adjacency_matrix[self.lookup_table[key]][self.lookup_table[connection]] = math.sqrt((curr_waypoint.x - connection_waypoint.x)**2 + (curr_waypoint.y - connection_waypoint.y)**2)
         self.graph = Graph(count)
         self.graph.graph = adjacency_matrix
@@ -101,28 +109,30 @@ class NavigateWaypoint:
         rospy.logdebug(self.waypoints[waypoint])
 
         self.curr_goal = waypoint
-        self.move_pub.publish(self.waypoints[waypoint])
+        self.move_pub.publish(self.waypoints[waypoint].poseStamped)
         rospy.logdebug('Published')
 
     def navigate_to_waypoint(self, msg: WaypointRequest):
         goal = msg.data.lower()
-        if goal not in self.waypoints.keys():
-            rospy.logdebug('Waypoint unknown')
+        if goal not in self.features.keys():
+            rospy.logdebug('Feature unknown')
             return WaypointResponse()
-        waypoints = list(map(lambda x: self.lookup_table_reverse[x], self.graph.dijkstra(self.lookup_table[self.curr_waypoint], self.lookup_table[goal])))
-        waypoints.append(goal)
-        waypoints = waypoints[1:]
+        if self.features[goal].waypoint is None:
+            rospy.logdebug('Feature has no waypoint')
+            return WaypointResponse()
+        
+        waypoints = list(map(lambda x: self.lookup_table_reverse[x], self.graph.dijkstra(self.lookup_table[self.features[self.curr_feature].waypoint], self.lookup_table[self.features[goal].waypoint])))
+        waypoints.append(self.features[goal].waypoint)
         rospy.logdebug(waypoints)
         self.update_move_base('xy_goal_tolerance', 1.0)
         for i, waypoint in enumerate(waypoints):
             if i == len(waypoints) - 1:
                 self.update_move_base('xy_goal_tolerance', 0.1)
             self.navigate(waypoint)
-            self.curr_waypoint = waypoint
             rospy.sleep(1)
             while self.moving or self.pause:
                 rospy.sleep(1)
-        self.curr_waypoint = goal
+        self.curr_feature = goal
         rospy.logdebug('Reached ' + goal)
         return WaypointResponse()
     
@@ -142,7 +152,7 @@ class NavigateWaypoint:
         return m
     
     def get_waypoints_callback(self, req: GetWaypointsRequest):
-        return GetWaypointsResponse(waypoints=self.waypoints.keys())
+        return GetWaypointsResponse(waypoints=self.features.keys())
     
 
 if __name__ == '__main__':
@@ -150,5 +160,6 @@ if __name__ == '__main__':
     node = NavigateWaypoint()
     rospy.sleep(1)
     # node.navigate_to_waypoint('M1')
+    rospy.loginfo('Ready')
     while not rospy.is_shutdown():
         rospy.spin()
