@@ -58,4 +58,6 @@
 
   <node name="publish_ground_truth_odom" pkg="stretch_gazebo" type="publish_ground_truth_odom.py" output="screen"/>
 
+  <node name="relay" pkg="topic_tools" type="relay" args="/scan /scan_filtered" respawn="true" />
+
 </launch>
