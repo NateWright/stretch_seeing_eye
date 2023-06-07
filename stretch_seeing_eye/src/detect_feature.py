@@ -8,8 +8,10 @@ from std_msgs.msg import String
 from geometry_msgs.msg import Point32, Point, PointStamped
 from shapely.geometry import Point as ShapelyPoint
 from shapely.geometry.polygon import Polygon as ShapelyPolygon
+from nav_msgs.srv import GetPlan, GetPlanRequest, GetPlanResponse
 
-from stretch_seeing_eye.srv import Feature, FeatureRequest, FeatureResponse
+from stretch_seeing_eye.feature import Feature
+from stretch_seeing_eye.srv import Feature as FeatureService, FeatureRequest, FeatureResponse
 
 MARKER_TOPIC = '/stretch_seeing_eye/create_marker'
 
@@ -22,8 +24,12 @@ class DetectFeature:
     def __init__(self):
         rospy.wait_for_service(MARKER_TOPIC)
 
+        self.set_detail_level_sub = rospy.Subscriber('/stretch_seeing_eye/set_detail_level', String, self.set_detail_level_callback)
+
         self.publish_feature = rospy.Publisher('/stretch_seeing_eye/feature', String, queue_size=1)
-        self.create_feature_marker = rospy.ServiceProxy(MARKER_TOPIC, Feature)
+
+        self.create_feature_marker = rospy.ServiceProxy(MARKER_TOPIC, FeatureService)
+        self.make_plan_service = rospy.ServiceProxy('/move_base/NavfnROS/make_plan', GetPlan, persistent=True)
 
         self.tf_buffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tf_buffer)
@@ -34,9 +40,8 @@ class DetectFeature:
             'feature_distance': rospy.get_param('detect_feature/Feature_Detection/feature_distance'),
         }
 
-        rospy.logdebug(self.parameters)
-
         self.features = {}
+        self.previous_feature = None
         self.detail_level: DetailLevel = getattr(DetailLevel, rospy.get_param('detect_feature/Feature_Detection/detail_level'))
         
         self.import_features(rospy.get_param('/description_file'))
@@ -51,63 +56,78 @@ class DetectFeature:
             for line in data:
                 if line == "":
                     continue
-                rospy.logdebug(line.strip())
-                line = line.strip().split(',')
+                f = Feature(line.strip())
+                self.features[f.detail_level][f.name] = f
+                self.create_feature_marker(FeatureRequest(points=f.points, detail_level=f.detail_level - 1))
 
-                name = line[0]
-                description = line[1]
-                count = line[2]
-                points: Point32 = []
-                index = 3
-                for i in range(int(count)):
-                    points.append(Point32(x=float(line[index]), y=float(line[index+1]), z=0.0))
-                    index += 2
-                
-                detail_level: DetailLevel = getattr(DetailLevel, line[index]).value
+    def set_detail_level_callback(self, msg: String):
+        self.detail_level = getattr(DetailLevel, msg.data)
+        rospy.logdebug('Set detail level to {}'.format(self.detail_level))
 
-                self.features[detail_level][name] = {'Description': description, 'Points': points}
+    def check_feature_point(self, key: str, feature: Feature):
+        try:
+            point = PointStamped(point=Point(x=feature.points[0].x, y=feature.points[0].y, z=feature.points[0].z))
+            point.header.frame_id = 'map'
+            point = self.tf_buffer.transform(point, 'base_link')
+            transform = self.tf_buffer.lookup_transform('map', 'base_link', rospy.Time())
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            return
+        request = GetPlanRequest()
+        request.start.header.frame_id = 'map'
+        request.start.pose.position.x = transform.transform.translation.x
+        request.start.pose.position.y = transform.transform.translation.y
+        request.start.pose.orientation.w = 1.0
+        request.goal = feature.getPoseStamped()
 
-                self.create_feature_marker(FeatureRequest(points=points, detail_level=detail_level - 1))
+        try:
+            plan: GetPlanResponse = self.make_plan_service(request)
+        except:
+            return
+
+        length = 0
+        for i, el in enumerate(plan.plan.poses):
+            if i == 0:
+                continue
+            length += Math.sqrt((el.pose.position.x - plan.plan.poses[i-1].pose.position.x)**2 + (el.pose.position.y - plan.plan.poses[i-1].pose.position.y)**2)
+
+        if point.point.x > 0 and length < 5:
+            rospy.logdebug('Found feature: {}'.format(key))
+            rospy.logdebug('\t Angle: {}'.format(Math.degrees(Math.atan2(point.point.y, point.point.x))))
+            self.publish_feature.publish(feature.description)
+            self.previous_feature = key
+    
+    def check_feature_polygon(self, key: str, feature: Feature):
+        try:
+            transform = self.tf_buffer.lookup_transform('map', 'base_link', rospy.Time())
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            rospy.logdebug('No transform found')
+            return
+        points: ShapelyPoint = []
+        for point in feature.points:
+            points.append(ShapelyPoint(point.x, point.y))
+        polygon = ShapelyPolygon(points)
+        if polygon.distance(ShapelyPoint(transform.transform.translation.x, transform.transform.translation.y)) <= self.parameters['feature_distance']:
+            rospy.logdebug('Found feature: {}'.format(feature.name))
+            self.publish_feature.publish(feature.description)
+            self.previous_feature = key
+
+    def check_range(self):
+        for detail_level in DetailLevel:
+            if detail_level.value > self.detail_level.value:
+                break
+            for key, value in self.features[detail_level.value].items():
+                assert isinstance(value, Feature)
+                if len(value.points) == 1 and self.previous_feature != key:
+                    self.check_feature_point(key, value)
+                elif len(value.points) == 4 and self.previous_feature != key:
+                    self.check_feature_polygon(key, value)
+
     
     def start(self):
         rate = rospy.Rate(10)
-        previous_feature = None
+        self.previous_feature = None
         while not rospy.is_shutdown():
-            for detail_level in DetailLevel:
-                if detail_level.value > self.detail_level.value:
-                    break
-                for key, value in self.features[detail_level.value].items():
-                    if len(value['Points']) == 1 and previous_feature != key:
-                        try:
-                            point = PointStamped()
-                            point.point.x = value['Points'][0].x
-                            point.point.y = value['Points'][0].y
-                            point.point.z = value['Points'][0].z
-                            point.header.frame_id = 'map'
-                            point = self.tf_buffer.transform(point, 'base_link')
-                            transform = self.tf_buffer.lookup_transform('base_link', 'map', rospy.Time())
-                        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                            continue
-                        if (point.point.x)**2 + (point.point.y)**2 < (self.parameters['door_distance'])**2 and abs(Math.atan(point.point.y/point.point.x)) < self.parameters['door_detection_cone']:
-                            rospy.logdebug('Found feature: {}'.format(key))
-                            self.publish_feature.publish(value['Description'])
-                            previous_feature = key
-                            break
-                    elif len(value['Points']) == 4 and previous_feature != key:
-                        try:
-                            transform = self.tf_buffer.lookup_transform('map', 'base_link', rospy.Time())
-                            # rospy.logdebug(transform)
-                            points: ShapelyPoint = []
-                            for point in value['Points']:
-                                points.append(ShapelyPoint(point.x, point.y))
-                            polygon = ShapelyPolygon(points)
-                            if polygon.distance(ShapelyPoint(transform.transform.translation.x, transform.transform.translation.y)) <= self.parameters['feature_distance']:
-                                rospy.logdebug('Found feature: {}'.format(value))
-                                self.publish_feature.publish(value['Description'])
-                                previous_feature = key
-                        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                            rospy.logdebug('No transform found')
-                            continue
+            self.check_range()
             rate.sleep()
 
 

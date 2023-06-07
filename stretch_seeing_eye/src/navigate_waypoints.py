@@ -1,7 +1,7 @@
 import rospy
 import math
 
-from std_msgs.msg import Header, String
+from std_msgs.msg import Header, String, Float32
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from actionlib_msgs.msg import GoalStatusArray, GoalID
 from dynamic_reconfigure import client
@@ -24,6 +24,7 @@ class NavigateWaypoint:
         self.move_base_sub = rospy.Subscriber('/move_base/status', GoalStatusArray, self.move_base_status_callback, queue_size=1)
         # self.command_sub = rospy.Subscriber('/stretch_seeing_eye/command', String, self.command_callback, queue_size=1)
         self.set_curr_waypoint_sub = rospy.Subscriber('/stretch_seeing_eye/set_curr_waypoint', String, self.set_curr_waypoint_callback, queue_size=1)
+        self.set_max_vel_sub = rospy.Subscriber('/stretch_seeing_eye/set_max_vel', Float32, self.set_max_vel_callback, queue_size=1)
 
         self.navigate_to_waypoint_service = rospy.Service('/stretch_seeing_eye/navigate_to_waypoint', WaypointSrv, self.navigate_to_waypoint)
         self.get_waypoints_service = rospy.Service('/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
@@ -34,14 +35,20 @@ class NavigateWaypoint:
 
         self.moving = False
         self.pause = False
+        self.max_val = 0.3
+
+
         self.waypoints = {}
         self.features = {}
         self.lookup_table = {}
         self.lookup_table_reverse = {}
         self.curr_feature = 'base'
         self.curr_goal = None
-        rospy.logdebug(rospy.get_param('/description_file'))
         self.import_data(rospy.get_param('/description_file'))
+
+    def set_max_vel_callback(self, msg: Float32):
+        self.max_val = msg.data
+        self.update_move_base('max_vel_x', self.max_val)
 
     def move_base_status_callback(self, msg: GoalStatusArray):
         if len(msg.status_list) and msg.status_list[-1].status == 1:
@@ -92,7 +99,7 @@ class NavigateWaypoint:
                 f = Feature(line.strip())
                 if f.waypoint is not None:
                     # rospy.logdebug('Feature ' + f.name + ' has waypoint ' + f.waypoint)
-                    self.features[f.name] = f
+                    self.features[f.name.lower()] = f
         self.waypoint_rviz_pub.publish(markers)
         rows, cols = count, count
         adjacency_matrix = [[0 for i in range(cols)] for j in range(rows)]
@@ -124,6 +131,7 @@ class NavigateWaypoint:
         waypoints = list(map(lambda x: self.lookup_table_reverse[x], self.graph.dijkstra(self.lookup_table[self.features[self.curr_feature].waypoint], self.lookup_table[self.features[goal].waypoint])))
         waypoints.append(self.features[goal].waypoint)
         rospy.logdebug(waypoints)
+        self.update_move_base('max_vel_x', self.max_val)
         self.update_move_base('xy_goal_tolerance', 1.0)
         for i, waypoint in enumerate(waypoints):
             if i == len(waypoints) - 1:
@@ -152,7 +160,9 @@ class NavigateWaypoint:
         return m
     
     def get_waypoints_callback(self, req: GetWaypointsRequest):
-        return GetWaypointsResponse(waypoints=self.features.keys())
+        arr = [self.features[key].name for key in self.features.keys()]
+        arr.sort()
+        return GetWaypointsResponse(waypoints=arr)
     
 
 if __name__ == '__main__':
