@@ -11,7 +11,8 @@ from shapely.geometry.polygon import Polygon as ShapelyPolygon
 from nav_msgs.srv import GetPlan, GetPlanRequest, GetPlanResponse
 
 from stretch_seeing_eye.feature import Feature
-from stretch_seeing_eye.srv import Feature as FeatureService, FeatureRequest, FeatureResponse
+from stretch_seeing_eye.srv import Feature as FeatureService, FeatureRequest
+from stretch_seeing_eye.msg import Door
 
 MARKER_TOPIC = '/stretch_seeing_eye/create_marker'
 
@@ -26,7 +27,7 @@ class DetectFeature:
 
         self.set_detail_level_sub = rospy.Subscriber('/stretch_seeing_eye/set_detail_level', String, self.set_detail_level_callback)
 
-        self.publish_feature = rospy.Publisher('/stretch_seeing_eye/feature', String, queue_size=1)
+        self.publish_feature = rospy.Publisher('/stretch_seeing_eye/feature', Door, queue_size=1)
 
         self.create_feature_marker = rospy.ServiceProxy(MARKER_TOPIC, FeatureService)
         self.make_plan_service = rospy.ServiceProxy('/move_base/NavfnROS/make_plan', GetPlan, persistent=True)
@@ -93,7 +94,7 @@ class DetectFeature:
         if point.point.x > 0 and length < 5:
             rospy.logdebug('Found feature: {}'.format(key))
             rospy.logdebug('\t Angle: {}'.format(Math.degrees(Math.atan2(point.point.y, point.point.x))))
-            self.publish_feature.publish(feature.description)
+            self.publish_feature.publish(Door(description=feature.description, degree=int(Math.degrees(Math.atan2(point.point.y, point.point.x)))))
             self.previous_feature = key
     
     def check_feature_polygon(self, key: str, feature: Feature):

@@ -1,2 +1,2 @@
-string name
+string description
 int32 degree
