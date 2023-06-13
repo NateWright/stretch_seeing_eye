@@ -172,6 +172,7 @@ catkin_install_python(PROGRAMS
   src/voice_recognition_test.py
   src/effort_sensing_test.py
   src/face_tracking.py
+  src/face_follow.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

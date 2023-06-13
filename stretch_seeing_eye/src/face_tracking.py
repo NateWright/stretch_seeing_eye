@@ -2,37 +2,31 @@
 import rospy
 import cv2
 import dlib
-import message_filters
-import tf2_ros
 import ros_numpy
+
+import math as Math
+import numpy as np
 
 from cv_bridge import CvBridge
 import sensor_msgs.point_cloud2 as pc2
 
-from std_msgs.msg import Header
 from sensor_msgs.msg import Image, PointCloud2
-from stretch_moveit_shim.srv import SetJoints, SetJointsRequest
-from stretch_seeing_eye.msg import Tracking
+from geometry_msgs.msg import PointStamped
 
 class TestClass():
     def __init__(self):
         self.detector = dlib.get_frontal_face_detector()
         self.old_faces = []
-        # self.test = rospy.Subscriber('/camera/color/image_raw', Image, self.callback)
-        image_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
-        cloud_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
-        self.time_sync = message_filters.ApproximateTimeSynchronizer([image_sub, cloud_sub], 1, 0.1)
-        self.time_sync.registerCallback(self.callback)
+        self.pointcloud_sub =rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.callback, queue_size=1)
         self.face_tracking_pub = rospy.Publisher('/stretch_seeing_eye/face_tracking', Image, queue_size=10)
-        self.face_tracking_point_pub = rospy.Publisher('/stretch_seeing_eye/face_tracking_point', Tracking, queue_size=10)
-        self.move_it_service = rospy.ServiceProxy('/stretch_interface/set_joints', SetJoints)
+        self.face_tracking_point_pub = rospy.Publisher('/stretch_seeing_eye/face_tracking_point', PointStamped, queue_size=10)
         self.bridge = CvBridge()
 
-    def callback(self, data: Image, data_depth: Image):
-    # def callback(self, data: Image):
-        # rospy.logdebug('callback')
-        image = self.bridge.imgmsg_to_cv2(data, 'bgr8')
-        depth_image = self.bridge.imgmsg_to_cv2(data_depth, 'passthrough')
+    def callback(self, cloud: PointCloud2):
+        pc2_arr = ros_numpy.point_cloud2.pointcloud2_to_array(cloud)
+        arr = ros_numpy.point_cloud2.split_rgb_field(pc2_arr)
+        pointcloud_to_image = lambda x: np.uint8((np.uint(x['r']) + np.uint(x['g']) + np.uint(x['b'])) / 3)
+        image = pointcloud_to_image(arr)
         image = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)
         image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
 
@@ -55,40 +49,27 @@ class TestClass():
                         int(pos.bottom()),
                     )
                     center = (int(pos.left() + pos.width() / 2), int(pos.top() + pos.height() / 2))
-                    self.face_tracking_point_pub.publish(Tracking(header=Header(stamp=rospy.Time.now()), x=center[1], y=center[0]))
-                    # self.face_depth_pub.publish(depth_image[center[1], center[0]] * 0.001)
+                    p = PointStamped()
+                    p.header = cloud.header
+                    p.header.frame_id = cloud.header.frame_id
+                    x = center[1] * 2
+                    y = pc2_arr.shape[0] - 1 - center[0] * 2
+                    p.point.x = pc2_arr[y][x][0]
+                    p.point.y = pc2_arr[y][x][1]
+                    p.point.z = pc2_arr[y][x][2]
+                    if x >= 0 and x < pc2_arr.shape[1] and y >= 0 and y < pc2_arr.shape[0]:
+                        self.face_tracking_point_pub.publish(p)
+                        
                     cv2.circle(image, center, radius=4, color=(0, 0, 255), thickness=-1)
                     cv2.rectangle(image, (pos.left(), pos.top()), (pos.right(), pos.bottom()),
                                 (100, 200, 100))
                 else:
                     self.old_faces.pop(i)
         # publish image
-        self.face_tracking_pub.publish(self.bridge.cv2_to_imgmsg(image, 'bgr8'))
-
-class FollowClass():
-    def __init__(self) -> None:
-        self.tf_buffer = tf2_ros.Buffer()
-        self.listener = tf2_ros.TransformListener(self.tf_buffer)
-
-        tracking_sub = message_filters.Subscriber('/stretch_seeing_eye/face_tracking_point', Tracking)
-        cloud_sub = message_filters.Subscriber('/camera/depth/color/points', PointCloud2)
-        self.time_sync = message_filters.ApproximateTimeSynchronizer([tracking_sub, cloud_sub], 1, 0.1)
-        self.time_sync.registerCallback(self.callback)
-
-    def callback(self, track: Tracking, cloud: PointCloud2):
-        points = ros_numpy.numpify(cloud)
-        # point = points[track.x][track.y]
-        rospy.logdebug(points.shape)
-        # try:
-        #     transform = self.tf_buffer.lookup_transform('map', 'base_link', rospy.Time())
-        # except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-        #     rospy.logdebug('No transform found')
-        #     return
-        # return
+        self.face_tracking_pub.publish(self.bridge.cv2_to_imgmsg(image, '8UC1'))
 
 
 if __name__ == '__main__':
     rospy.init_node('face_tracking', anonymous=True, log_level=rospy.DEBUG)
     node = TestClass()
-    node2 = FollowClass()
     rospy.spin()
