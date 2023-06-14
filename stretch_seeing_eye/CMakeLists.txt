@@ -14,8 +14,11 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   geometry_msgs
   message_generation
+  cv_bridge
 )
 find_package(Eigen3 REQUIRED)
+find_package(OpenCV REQUIRED)
+# pkg_check_modules(Tesseract REQUIRED tesseract)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -125,6 +128,8 @@ include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+  ${Tesseract_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -141,6 +146,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(publish_plane_node src/publish_plane.cpp)
+add_executable(ocr_node src/ocr.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -151,10 +157,17 @@ add_executable(publish_plane_node src/publish_plane.cpp)
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 add_dependencies(publish_plane_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(ocr_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(publish_plane_node
   ${catkin_LIBRARIES}
+)
+target_link_libraries(ocr_node
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  # ${Tesseract_LIBRARIES}
+  lept tesseract
 )
 
 #############
