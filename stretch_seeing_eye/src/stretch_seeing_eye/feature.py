@@ -1,12 +1,9 @@
 import rospy
-from enum import Enum
 from std_msgs.msg import Header
 from geometry_msgs.msg import Point32, PoseStamped
 
-class DetailLevel(Enum):
-    LOW = 1
-    MEDIUM = 2
-    HIGH = 3
+from stretch_seeing_eye.DetailLevel import DetailLevel
+
 
 class Feature:
     def __init__(self, str: str):
@@ -19,15 +16,17 @@ class Feature:
         self.points: Point32 = []
         index = 3
         for i in range(int(count)):
-            self.points.append(Point32(x=float(data[index]), y=float(data[index+1]), z=0.0))
+            self.points.append(
+                Point32(x=float(data[index]), y=float(data[index+1]), z=0.0))
             index += 2
-        
-        self.detail_level: DetailLevel = getattr(DetailLevel, data[index]).value
+
+        self.detail_level: DetailLevel = getattr(
+            DetailLevel, data[index]).value
 
         self.waypoint = None
         if len(data) > index + 1:
             self.waypoint = data[index+1].lower()
-    
+
     def getPoseStamped(self):
         p = PoseStamped()
         p.pose.position.x = self.points[0].x
@@ -36,4 +35,3 @@ class Feature:
         p.pose.orientation.w = 1.0
         p.header = Header(frame_id='map')
         return p
-

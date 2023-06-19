@@ -147,6 +147,7 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(publish_plane_node src/publish_plane.cpp)
 add_executable(ocr_node src/ocr.cpp)
+add_executable(test_image_node src/test_image_publisher.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -158,6 +159,7 @@ add_executable(ocr_node src/ocr.cpp)
 ## same as for the library above
 add_dependencies(publish_plane_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(ocr_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(test_image_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(publish_plane_node
@@ -168,6 +170,10 @@ target_link_libraries(ocr_node
   ${OpenCV_LIBRARIES}
   # ${Tesseract_LIBRARIES}
   lept tesseract
+)
+target_link_libraries(test_image_node
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
 )
 
 #############
@@ -186,6 +192,7 @@ catkin_install_python(PROGRAMS
   src/effort_sensing_test.py
   src/face_tracking.py
   src/face_follow.py
+  src/ocr.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

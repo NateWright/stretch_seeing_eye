@@ -1,0 +1,3 @@
+<launch>
+    <node pkg="stretch_seeing_eye" type="test_image_node"  name="test_image_node" output="screen"/>
+</launch>
