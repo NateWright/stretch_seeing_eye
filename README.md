@@ -14,3 +14,7 @@ roslaunch rosbridge_server rosbridge_websocket.launch
 roslaunch stretch_seeing_eye navigation.launch location:=gps_room rviz:=false
 rviz -d `rospack find stretch_seeing_eye`/rviz/navigation.rviz
 ```
+
+```bash
+rosrun rosserial_python serial_node.py /dev/ttyACM0
+```
