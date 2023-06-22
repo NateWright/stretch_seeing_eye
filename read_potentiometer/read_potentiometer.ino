@@ -15,7 +15,7 @@
 ros::NodeHandle nh;
 
 std_msgs::UInt32 msg;
-ros::Publisher chatter("chatter", &msg);
+ros::Publisher chatter("/stretch_seeing_eye/handle_reading", &msg);
 
 
 void setup()
