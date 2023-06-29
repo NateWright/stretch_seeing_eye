@@ -134,7 +134,7 @@ class NavigateWaypoint:
         self.features = {}
         self.lookup_table = {}
         self.lookup_table_reverse = {}
-        self.curr_feature = 'base'
+        self.curr_feature = 'Base'
         self.curr_goal = None
         self.import_data(rospy.get_param('/description_file'))
 
@@ -153,7 +153,7 @@ class NavigateWaypoint:
             return SetBoolResponse(True, 'Resumed navigation')
 
     def set_curr_waypoint_callback(self, msg: String):
-        self.curr_feature = msg.data.lower()
+        self.curr_feature = msg.data
 
     def import_data(self, file: str):
         connections = {}
@@ -167,16 +167,20 @@ class NavigateWaypoint:
                     continue
                 w = Waypoint(line)
                 self.waypoints[w.name] = w
-                markers.append(self.create_marker(
-                    self.waypoints[w.name].poseStamped.pose.position, self.waypoints[w.name].poseStamped.pose.orientation, count))
+                markers.append(
+                    self.create_marker(
+                        self.waypoints[w.name].poseStamped.pose.position,
+                        self.waypoints[w.name].poseStamped.pose.orientation,
+                        count)
+                )
                 connections[w.name] = w.connections
                 self.lookup_table[w.name] = count
                 self.lookup_table_reverse[count] = w.name
                 if w.navigatable:
-                    self.features[w.name.lower()] = {
+                    self.features[w.name] = {
                         'name': w.name, 'waypoint': w.name}
                 if w.door:
-                    self.features[w.name.lower()] = {
+                    self.features[w.name] = {
                         'name': w.name, 'waypoint': w.name}
                 count += 1
             for line in data[1].split('\n'):
@@ -185,7 +189,7 @@ class NavigateWaypoint:
                 f = Feature(line.strip())
                 if f.waypoint is not None:
                     # rospy.logdebug('Feature ' + f.name + ' has waypoint ' + f.waypoint)
-                    self.features[f.name.lower()] = {
+                    self.features[f.name] = {
                         'name': f.name, 'waypoint': f.waypoint}
         self.waypoint_rviz_pub.publish(MarkerArray(markers=markers))
         rows, cols = count, count
@@ -208,7 +212,7 @@ class NavigateWaypoint:
         rospy.logdebug('Published')
 
     def navigate_to_waypoint(self, msg: WaypointRequest):
-        goal = msg.data.lower()
+        goal = msg.data
         if goal not in self.features.keys():
             rospy.logdebug('Feature unknown')
             return WaypointResponse()

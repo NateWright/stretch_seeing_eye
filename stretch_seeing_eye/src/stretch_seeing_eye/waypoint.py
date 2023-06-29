@@ -22,12 +22,12 @@ class Waypoint:
         connectionCount = int(data[3])
         self.connections = []
         for i in range(4, 4 + connectionCount):
-            self.connections.append(data[i].strip().lower())
+            self.connections.append(data[i].strip())
 
         self.navigatable = data[4 + connectionCount].strip().lower() == 'true'
         self.door = data[5 + connectionCount].strip().lower() == 'true'
         if self.door:
             self.entrance = data[6 +
-                                 connectionCount].strip().lower() == 'Entrance'
+                                 connectionCount].strip().lower() == 'entrance'
             self.detail_level: DetailLevel = getattr(
                 DetailLevel, data[7 + connectionCount]).value
