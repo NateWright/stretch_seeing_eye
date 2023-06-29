@@ -20,12 +20,13 @@
   <include file="$(find amcl)/examples/amcl_diff.launch" />
 
   <!-- NAVIGATION -->
-  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+  <node pkg="mbf_costmap_nav" type="mbf_costmap_nav" respawn="false" name="mbf_costmap_nav" output="screen">
     <rosparam file="$(find stretch_navigation)/config/common_costmap_params.yaml" command="load" ns="global_costmap" />
     <rosparam file="$(find stretch_navigation)/config/common_costmap_params.yaml" command="load" ns="local_costmap" />
     <rosparam file="$(find stretch_navigation)/config/local_costmap_params.yaml" command="load" />
     <rosparam file="$(find stretch_navigation)/config/global_costmap_params_withmap.yaml" command="load" />
     <rosparam file="$(find stretch_seeing_eye)/config/move_base/base_local_planner_params.yaml" command="load" />
+    <rosparam file="$(find stretch_seeing_eye)/config/move_base/move_base.yaml" command="load" />
     <remap from="/cmd_vel" to="/stretch_diff_drive_controller/cmd_vel" />
     <remap from="/odom" to="/stretch_diff_drive_controller/odom" />
   </node>
