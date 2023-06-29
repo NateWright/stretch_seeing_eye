@@ -15,15 +15,18 @@ tf2_ros::Buffer tfBuffer;
 tf2_ros::TransformListener *tfListener;
 
 void callback(sensor_msgs::PointCloud2 cloud) {
-    sensor_msgs::PointCloud2 transformed_cloud;
-    tfBuffer.transform(cloud, transformed_cloud, "base_link", ros::Duration(1.0));
+    try {
+        sensor_msgs::PointCloud2 transformed_cloud;
+        tfBuffer.transform(cloud, transformed_cloud, "base_link", ros::Duration(1.0));
 
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcl_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::fromROSMsg(transformed_cloud, *pcl_cloud);
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr pcl_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+        pcl::fromROSMsg(transformed_cloud, *pcl_cloud);
 
-    pcl::io::savePCDFileASCII("/home/nwright/ros/test_pcd.pcd", *pcl_cloud);
-    ROS_INFO("Saved %d data points to test_pcd.pcd.", (int)pcl_cloud->points.size());
-    exit(0);
+        pcl::io::savePCDFileASCII("/home/nwright/ros/test_pcd.pcd", *pcl_cloud);
+        ROS_INFO("Saved %d data points to test_pcd.pcd.", (int)pcl_cloud->points.size());
+        exit(0);
+    } catch (...) {
+    }
 }
 
 int main(int argc, char **argv) {

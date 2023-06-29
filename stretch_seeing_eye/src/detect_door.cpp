@@ -228,19 +228,40 @@ class DoorDetector {
         };
 
         visual_tools_->deleteAllMarkers();
-        for (auto &line : lines) {
-            geometry_msgs::Point p1, p2;
-            p1.x = line[0].x;
-            p1.y = line[0].y;
-            p1.z = line[0].z;
-            p2.x = line.back().x;
-            p2.y = line.back().y;
-            p2.z = line.back().z;
-            if ((p2.y - p1.y) * (p2.y - p1.y) + (p2.z - p1.z) * (p2.z - p1.z) > 0.5 * 0.5)
-                visual_tools_->publishLine(p1, p2, rviz_visual_tools::GREEN, rviz_visual_tools::MEDIUM);
+        // for (auto &line : lines) {
+        //     geometry_msgs::Point p1, p2;
+        //     p1.x = line[0].x;
+        //     p1.y = line[0].y;
+        //     p1.z = line[0].z;
+        //     p2.x = line.back().x;
+        //     p2.y = line.back().y;
+        //     p2.z = line.back().z;
+        //     if ((p2.y - p1.y) * (p2.y - p1.y) + (p2.z - p1.z) * (p2.z - p1.z) > 0.5 * 0.5)
+        //         visual_tools_->publishLine(p1, p2, rviz_visual_tools::GREEN, rviz_visual_tools::MEDIUM);
+        // }
+        ROS_INFO_STREAM("line count: " << lines.size());
+        if (directions.size() != lines.size()) {
+            ROS_ERROR_STREAM("directions and lines size mismatch");
+            return wall_cloud;
+        }
+        for (size_t i = 0; i < directions.size() - 2; i++) {
+            if (directions[i] == Direction::UP && (directions[i + 1] == Direction::RIGHT || directions[i + 1] == Direction::LEFT) &&
+                directions[i + 2] == Direction::DOWN) {
+                ROS_INFO_STREAM("Found door");
+                for (size_t j = i; j < i + 3; j++) {
+                    geometry_msgs::Point p1, p2;
+                    p1.x = lines[j][0].x;
+                    p1.y = lines[j][0].y;
+                    p1.z = lines[j][0].z;
+                    p2.x = lines[j].back().x;
+                    p2.y = lines[j].back().y;
+                    p2.z = lines[j].back().z;
+                    visual_tools_->publishLine(p1, p2, rviz_visual_tools::GREEN, rviz_visual_tools::MEDIUM);
+                }
+                break;
+            }
         }
         visual_tools_->trigger();
-        ROS_INFO_STREAM("line count: " << lines.size());
         testHullPub.publish(wall_hull);
 
         // Picks out points behind plane
