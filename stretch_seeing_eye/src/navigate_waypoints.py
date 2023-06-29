@@ -1,5 +1,6 @@
 import rospy
 import math
+import actionlib
 
 from std_msgs.msg import Header, String, Float32
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
@@ -8,6 +9,8 @@ from dynamic_reconfigure import client
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA
 from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
+from mbf_msgs.msg import GetPathAction, GetPathGoal, GetPathResult, ExePathAction, ExePathGoal, ExePathFeedback
+from nav_msgs.msg import Path
 
 from stretch_seeing_eye.shortest_path import Graph
 from stretch_seeing_eye.waypoint import Waypoint
@@ -15,9 +18,91 @@ from stretch_seeing_eye.feature import Feature, DetailLevel
 from stretch_seeing_eye.srv import Waypoint as WaypointSrv, WaypointRequest, WaypointResponse, GetWaypoints, GetWaypointsRequest, GetWaypointsResponse
 
 
+class MoveBaseWaypointClient:
+    def __init__(self):
+        self.pathClient = actionlib.SimpleActionClient(
+            '/mbf_costmap_nav/get_path', GetPathAction)
+        self.exePathClient = actionlib.SimpleActionClient(
+            '/mbf_costmap_nav/exe_path', ExePathAction)
+
+        self.path_complete = False
+        self.paths = []
+        # self.pub = rospy.Publisher(
+        #     '/test_path', Path, queue_size=10)
+        self.pathClient.wait_for_server()
+        rospy.logdebug('connected to mbf server')
+
+    def navigate_waypoints(self, points: list):
+        self.points = points
+        self.path_complete = False
+        self.paths = []
+        trajectory = ExePathGoal()
+        trajectory.path.header.frame_id = 'map'
+        trajectory.path.poses = []
+        trajectory.tolerance_from_action = True
+        trajectory.dist_tolerance = 0.1
+        trajectory.angle_tolerance = 6.28
+
+        goal = GetPathGoal()
+        for i, point in enumerate(points):
+            if i == 0:
+                goal.use_start_pose = False
+                goal.target_pose = point
+                self.pathClient.send_goal(goal)
+                self.pathClient.wait_for_result()
+                result = self.pathClient.get_result()
+                if result is not None:
+                    trajectory.path.poses = result.path.poses
+                    trajectory.path.poses.pop()
+                    self.paths.append(
+                        self.calculateLength(trajectory.path.poses))
+                continue
+            goal.use_start_pose = True
+            goal.start_pose = trajectory.path.poses[-1]
+            goal.target_pose = point
+            self.pathClient.send_goal(goal)
+            self.pathClient.wait_for_result()
+            result = self.pathClient.get_result()
+            if result is not None:
+                result.path.poses.pop()
+                self.paths.append(self.calculateLength(result.path.poses))
+                trajectory.path.poses.extend(result.path.poses)
+        # self.pub.publish(trajectory.path)
+        self.paths.reverse()
+        for i, length in enumerate(self.paths):
+            if i == 0:
+                continue
+            self.paths[i] += self.paths[i-1]
+        rospy.logdebug(self.paths)
+        self.exePathClient.send_goal(
+            trajectory, done_cb=self.done, feedback_cb=self.feedback_cb)
+
+    def feedback_cb(self, feedback: ExePathFeedback):
+        if len(self.paths) < 0 and feedback.dist_to_goal < self.paths[-1]:
+            self.paths.pop()
+            self.points = self.points[1:]
+
+    def done(self, status, result):
+        self.path_complete = True
+
+    def pause(self):
+        self.exePathClient.cancel_goal()
+
+    def resume(self):
+        self.navigate_waypoints(self.points)
+
+    def calculateLength(self, path):
+        length = 0
+        for i in range(1, len(path)):
+            length += math.sqrt((path[i].pose.position.x - path[i-1].pose.position.x)**2 +
+                                (path[i].pose.position.y - path[i-1].pose.position.y)**2)
+        return length
+
+
 class NavigateWaypoint:
     def __init__(self):
         # Publishers and Subscribers
+        self.test_client = MoveBaseWaypointClient()
         self.move_pub = rospy.Publisher(
             '/move_base_simple/goal', PoseStamped, queue_size=10)
         self.waypoint_rviz_pub = rospy.Publisher(
@@ -25,8 +110,6 @@ class NavigateWaypoint:
         self.move_base_cancel_pub = rospy.Publisher(
             '/move_base/cancel', GoalID, queue_size=1)
 
-        self.move_base_sub = rospy.Subscriber(
-            '/move_base/status', GoalStatusArray, self.move_base_status_callback, queue_size=1)
         self.set_curr_waypoint_sub = rospy.Subscriber(
             '/stretch_seeing_eye/set_curr_waypoint', String, self.set_curr_waypoint_callback, queue_size=1)
         self.set_max_vel_sub = rospy.Subscriber(
@@ -40,7 +123,7 @@ class NavigateWaypoint:
             '/stretch_seeing_eye/pause_navigation', SetBool, self.pause_navigation_callback)
 
         self.client = client.Client(
-            '/move_base/DWAPlannerROS', timeout=30, config_callback=None)
+            '/mbf_costmap_nav/DWAPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
 
         self.moving = False
@@ -59,23 +142,14 @@ class NavigateWaypoint:
         self.max_val = msg.data
         self.update_move_base('max_vel_x', self.max_val)
 
-    def move_base_status_callback(self, msg: GoalStatusArray):
-        if len(msg.status_list) and msg.status_list[-1].status == 1:
-            self.moving = True
-        else:
-            self.moving = False
-        # rospy.logdebug('Moving: ' + str(self.moving))
-
     def pause_navigation_callback(self, msg: SetBoolRequest):
         self.pause = msg.data
         if self.pause:
-            rospy.logdebug('Pausing navigation')
-            self.move_base_cancel_pub.publish(GoalID())
+            self.test_client.pause()
             return SetBoolResponse(True, 'Paused navigation')
         else:
             rospy.logdebug('Resuming navigation')
-            self.navigate(self.curr_goal)
-            rospy.sleep(1)
+            self.test_client.resume()
             return SetBoolResponse(True, 'Resumed navigation')
 
     def set_curr_waypoint_callback(self, msg: String):
@@ -142,19 +216,16 @@ class NavigateWaypoint:
         start = self.lookup_table[self.features[self.curr_feature]['waypoint']]
         end = self.lookup_table[self.features[goal]['waypoint']]
         rospy.logdebug('Start: ' + str(start) + ' End: ' + str(end))
+
         waypoints = list(
             map(lambda x: self.lookup_table_reverse[x], self.graph.dijkstra(start, end)))
         waypoints.append(self.features[goal]['waypoint'])
         rospy.logdebug(waypoints)
-        self.update_move_base('max_vel_x', self.max_val)
-        self.update_move_base('xy_goal_tolerance', 1.0)
-        for i, waypoint in enumerate(waypoints):
-            if i == len(waypoints) - 1:
-                self.update_move_base('xy_goal_tolerance', 0.1)
-            self.navigate(waypoint)
-            rospy.sleep(1)
-            while self.moving or self.pause:
-                rospy.sleep(1)
+
+        points = [self.waypoints[w].poseStamped for w in waypoints]
+        self.test_client.navigate_waypoints(points)
+        while (not self.test_client.path_complete):
+            rospy.sleep(0.1)
         self.curr_feature = goal
         rospy.logdebug('Reached ' + goal)
         return WaypointResponse()
