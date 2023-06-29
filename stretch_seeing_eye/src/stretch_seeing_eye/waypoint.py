@@ -10,7 +10,8 @@ from stretch_seeing_eye.DetailLevel import DetailLevel
 class Waypoint:
     def __init__(self, str: str):
         data = str.split(',')
-        self.name = data[0].lower()
+        self.name = data[0]
+        self.name_lower = self.name.lower()
         self.poseStamped = PoseStamped(
             header=Header(frame_id='map'),
             pose=Pose(
