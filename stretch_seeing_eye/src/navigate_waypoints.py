@@ -2,8 +2,9 @@ import rospy
 import math
 import actionlib
 
+from tf.transformations import quaternion_from_euler
 from std_msgs.msg import Header, String, Float32
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, PoseArray
 from actionlib_msgs.msg import GoalStatusArray, GoalID
 from dynamic_reconfigure import client
 from visualization_msgs.msg import Marker, MarkerArray
@@ -27,8 +28,10 @@ class MoveBaseWaypointClient:
 
         self.path_complete = False
         self.paths = []
-        # self.pub = rospy.Publisher(
-        #     '/test_path', Path, queue_size=10)
+        self.pub = rospy.Publisher(
+            '/test_path', Path, queue_size=10)
+        self.pub2 = rospy.Publisher(
+            '/test_pose', PoseArray, queue_size=10)
         self.pathClient.wait_for_server()
         rospy.logdebug('connected to mbf server')
 
@@ -43,8 +46,9 @@ class MoveBaseWaypointClient:
         trajectory.dist_tolerance = 0.1
         trajectory.angle_tolerance = 6.28
 
-        goal = GetPathGoal()
+        # Get path
         for i, point in enumerate(points):
+            goal = GetPathGoal()
             if i == 0:
                 goal.use_start_pose = False
                 goal.target_pose = point
@@ -64,10 +68,21 @@ class MoveBaseWaypointClient:
             self.pathClient.wait_for_result()
             result = self.pathClient.get_result()
             if result is not None:
-                result.path.poses.pop()
+                # result.path.poses.pop()
                 self.paths.append(self.calculateLength(result.path.poses))
-                trajectory.path.poses.extend(result.path.poses)
-        # self.pub.publish(trajectory.path)
+                trajectory.path.poses.extend(result.path.poses[1:-1])
+        # end path
+        # Debug path
+        # for i, pose in enumerate(trajectory.path.poses):
+        #     if i == len(trajectory.path.poses) - 1:
+        #         break
+        #     yaw = math.atan2(trajectory.path.poses[i+1].pose.position.y - pose.pose.position.y,
+        #                      trajectory.path.poses[i+1].pose.position.x - pose.pose.position.x)
+        #     pose.pose.orientation = Quaternion(
+        #         *quaternion_from_euler(0, 0, yaw))
+        self.pub.publish(trajectory.path)
+        self.pub2.publish(PoseArray(header=Header(frame_id='map'), poses=[
+                          p.pose for p in trajectory.path.poses]))
         self.paths.reverse()
         for i, length in enumerate(self.paths):
             if i == 0:
@@ -78,7 +93,7 @@ class MoveBaseWaypointClient:
             trajectory, done_cb=self.done, feedback_cb=self.feedback_cb)
 
     def feedback_cb(self, feedback: ExePathFeedback):
-        if len(self.paths) < 0 and feedback.dist_to_goal < self.paths[-1]:
+        if len(self.paths) > 0 and feedback.dist_to_goal < self.paths[-1]:
             self.paths.pop()
             self.points = self.points[1:]
 
@@ -226,10 +241,27 @@ class NavigateWaypoint:
         waypoints.append(self.features[goal]['waypoint'])
         rospy.logdebug(waypoints)
 
+        door = False
+        inside = False
+
+        if 'Entrance' in goal:
+            door = True
+        elif 'Inside' in goal:
+            door = True
+            inside = True
+
         points = [self.waypoints[w].poseStamped for w in waypoints]
+        if inside:
+            points.pop()
         self.test_client.navigate_waypoints(points)
-        while (not self.test_client.path_complete):
+        while not self.test_client.path_complete:
             rospy.sleep(0.1)
+        if door:
+            door_open = True
+            rospy.logdebug('Door')
+            if door_open and inside:
+                self.test_client.navigate_waypoints(
+                    [self.waypoints[waypoints[-1].poseStamped]])
         self.curr_feature = goal
         rospy.logdebug('Reached ' + goal)
         return WaypointResponse()
