@@ -27,6 +27,7 @@
 #include <rviz_visual_tools/rviz_visual_tools.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
+#include <std_srvs/Trigger.h>
 
 #include <algorithm>
 #include <iterator>
@@ -71,8 +72,10 @@ Point averageCloud(const PointCloud::Ptr &cloud) {
 class DoorDetector {
    public:
     DoorDetector(ros::NodeHandlePtr nh) : nh(nh) {
-        cloudSub = nh->subscribe("/test_pointcloud", 1, &DoorDetector::door_detection, this);
+        // cloudSub = nh->subscribe("/test_pointcloud", 1, &DoorDetector::door_detection, this);
         // imageSub = nh->subscribe("/test_image", 1, &DoorDetector::door_detection_image, this);
+
+        service = nh->advertiseService("/stretch_seeing_eye/detect_door", &DoorDetector::door_detection_srv, this);
 
         testCloudPub = nh->advertise<PointCloud>("/test_pcd", 1);
         testHullPub = nh->advertise<PointCloud>("/test_hull", 1);
@@ -80,46 +83,57 @@ class DoorDetector {
         testImagePub = nh->advertise<sensor_msgs::Image>("/test_img", 1);
         visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("base_link", "/rviz_visual_markers"));
     }
-
-    void door_detection_image(const sensor_msgs::ImagePtr msg) {
-        cv_bridge::CvImagePtr cv_ptr;
-        try {
-            cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
-        } catch (cv_bridge::Exception &e) {
-            ROS_ERROR("cv_bridge exception: %s", e.what());
-            return;
+    bool door_detection_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res) {
+        const boost::shared_ptr<const PointCloud> pc = ros::topic::waitForMessage<PointCloud>("/camera/depth/color/points");
+        if (!pc) {
+            ROS_ERROR_STREAM("No pointcloud received");
+            res.success = false;
+            return true;
         }
-        cv::Mat detected_edges;
-        cv::blur(cv_ptr->image, detected_edges, cv::Size(3, 3));
-        if (!detected_edges.isContinuous()) {
-            ROS_ERROR("Image is not continuous");
-            return;
-        }
-        std::vector<uchar> detected_edges_vec(detected_edges.size().area() / 2 + 1);
-        std::partial_sort_copy(detected_edges.begin<uchar>(), detected_edges.end<uchar>(),
-                               detected_edges_vec.begin(), detected_edges_vec.end());
-        int md = detected_edges_vec.back();
-        int lower_value = std::max(0, (int)((1.0 - 0.33) * (float)md));
-        int upper_value = std::min(255, (int)((1.0 + 0.33) * (float)md));
-        cv::Canny(detected_edges, detected_edges, lower_value, upper_value);
-
-        cv_ptr->image = detected_edges;
-        testImagePub.publish(cv_ptr->toImageMsg());
+        res.success = door_detection(pc);
+        return true;
     }
 
-    void door_detection(const PointCloud::Ptr &cloud) {
+    // void door_detection_image(const sensor_msgs::ImagePtr msg) {
+    //     cv_bridge::CvImagePtr cv_ptr;
+    //     try {
+    //         cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
+    //     } catch (cv_bridge::Exception &e) {
+    //         ROS_ERROR("cv_bridge exception: %s", e.what());
+    //         return;
+    //     }
+    //     cv::Mat detected_edges;
+    //     cv::blur(cv_ptr->image, detected_edges, cv::Size(3, 3));
+    //     if (!detected_edges.isContinuous()) {
+    //         ROS_ERROR("Image is not continuous");
+    //         return;
+    //     }
+    //     std::vector<uchar> detected_edges_vec(detected_edges.size().area() / 2 + 1);
+    //     std::partial_sort_copy(detected_edges.begin<uchar>(), detected_edges.end<uchar>(),
+    //                            detected_edges_vec.begin(), detected_edges_vec.end());
+    //     int md = detected_edges_vec.back();
+    //     int lower_value = std::max(0, (int)((1.0 - 0.33) * (float)md));
+    //     int upper_value = std::min(255, (int)((1.0 + 0.33) * (float)md));
+    //     cv::Canny(detected_edges, detected_edges, lower_value, upper_value);
+
+    //     cv_ptr->image = detected_edges;
+    //     testImagePub.publish(cv_ptr->toImageMsg());
+    // }
+
+    bool door_detection(const PointCloud::ConstPtr &cloud) {
         PointCloud::Ptr voxel_cloud = voxelize_cloud(cloud);
         PointCloud::Ptr distance_cloud = filterDistance(voxel_cloud);
-        PointCloud::Ptr wall_cloud = findWall(distance_cloud);
+        bool b = findWall(distance_cloud);
         // Point p = averageCloud(wall_cloud);
         // ROS_INFO_STREAM(p);
         // float distance = distancePointToPlane(p, plane_parameters);
         // ROS_INFO_STREAM(distance);
 
-        testCloudPub.publish(wall_cloud);
+        // testCloudPub.publish(wall_cloud);
+        return b;
     }
 
-    PointCloud::Ptr voxelize_cloud(const PointCloud::Ptr &cloud) {
+    PointCloud::Ptr voxelize_cloud(const PointCloud::ConstPtr &cloud) {
         PointCloud::Ptr voxel_cloud(new PointCloud);
         pcl::VoxelGrid<Point> voxel_filter;
         voxel_filter.setInputCloud(cloud);
@@ -127,7 +141,7 @@ class DoorDetector {
         voxel_filter.filter(*voxel_cloud);
         return voxel_cloud;
     }
-    PointCloud::Ptr filterDistance(const PointCloud::Ptr &cloud) {
+    PointCloud::Ptr filterDistance(const PointCloud::ConstPtr &cloud) {
         PointCloud::Ptr segmented_cloud(new PointCloud);
         pcl::IndicesPtr indices(new std::vector<int>);
         pcl::PassThrough<Point> pass;
@@ -142,7 +156,7 @@ class DoorDetector {
         extract.filter(*segmented_cloud);
         return segmented_cloud;
     }
-    PointCloud::Ptr findWall(const PointCloud::Ptr &cloud) {
+    bool findWall(const PointCloud::ConstPtr &cloud) {
         pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices);  // Set of points in the plane
         pcl::SACSegmentation<Point> seg;
@@ -179,7 +193,7 @@ class DoorDetector {
 
         if (polygons.size() == 0) {
             ROS_ERROR_STREAM("No polygons found");
-            return wall_cloud;
+            return false;
         }
         pcl::Vertices v = polygons[0];
         std::vector<std::vector<Point>> lines;
@@ -242,12 +256,13 @@ class DoorDetector {
         ROS_INFO_STREAM("line count: " << lines.size());
         if (directions.size() != lines.size()) {
             ROS_ERROR_STREAM("directions and lines size mismatch");
-            return wall_cloud;
+            return false;
         }
         for (size_t i = 0; i < directions.size() - 2; i++) {
             if (directions[i] == Direction::UP && (directions[i + 1] == Direction::RIGHT || directions[i + 1] == Direction::LEFT) &&
                 directions[i + 2] == Direction::DOWN) {
                 ROS_INFO_STREAM("Found door");
+                return true;
                 for (size_t j = i; j < i + 3; j++) {
                     geometry_msgs::Point p1, p2;
                     p1.x = lines[j][0].x;
@@ -276,11 +291,14 @@ class DoorDetector {
         // PointCloud::Ptr wall_cloud(new PointCloud);
         // pcl::copyPointCloud(*cloud, indices, *wall_cloud);
 
-        return wall_cloud;
+        // return wall_cloud;
+        return false;
     }
 
    private:
     ros::NodeHandlePtr nh;
+
+    ros::ServiceServer service;
 
     ros::Subscriber cloudSub;
     ros::Subscriber imageSub;

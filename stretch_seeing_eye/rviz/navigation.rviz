@@ -402,7 +402,7 @@ Visualization Manager:
       Draw Behind: true
       Enabled: true
       Name: Global Costmap
-      Topic: /mbf_costmap_nav/global_costmap/costmap
+      Topic: /move_base/global_costmap/costmap
       Unreliable: false
       Use Timestamp: false
       Value: true
@@ -412,7 +412,7 @@ Visualization Manager:
       Draw Behind: true
       Enabled: true
       Name: Local Costmap
-      Topic: /mbf_costmap_nav/local_costmap/costmap
+      Topic: /move_base/local_costmap/costmap
       Unreliable: false
       Use Timestamp: false
       Value: true
@@ -563,9 +563,9 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 5.483122825622559
-        Y: -1.7976828813552856
-        Z: -1.6109542846679688
+        X: 5.627142906188965
+        Y: 2.257755994796753
+        Z: -1.4056377410888672
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false

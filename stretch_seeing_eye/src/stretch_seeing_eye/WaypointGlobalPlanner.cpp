@@ -34,13 +34,8 @@ bool WaypointGlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start,
     }
     size_t current_waypoint = closestWaypoint(start);
     size_t goal_waypoint = closestWaypoint(goal);
-    ROS_INFO_STREAM("Current waypoint: " << current_waypoint);
-    ROS_INFO_STREAM("Goal waypoint: " << goal_waypoint);
     vector<int> path = dijkstra.DijkstraAlgo(current_waypoint, goal_waypoint);
     path.push_back(goal_waypoint);
-    for (auto& val : path) {
-        ROS_INFO_STREAM(val);
-    }
     std::vector<geometry_msgs::PoseStamped> points;
     std::vector<geometry_msgs::PoseStamped> tempPath;
     for (size_t i = 0; i < path.size(); i++) {

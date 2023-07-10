@@ -1,116 +1,19 @@
 import rospy
 import math
-import actionlib
 
 from tf.transformations import quaternion_from_euler
-from std_msgs.msg import Header, String, Float32
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, PoseArray
+from std_msgs.msg import Float32
+from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from actionlib_msgs.msg import GoalStatusArray, GoalID
 from dynamic_reconfigure import client
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA, Float32
-from std_srvs.srv import SetBool, SetBoolResponse, SetBoolRequest
-from mbf_msgs.msg import GetPathAction, GetPathGoal, GetPathResult, ExePathAction, ExePathGoal, ExePathFeedback
-from nav_msgs.msg import Path
+from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
 
-from stretch_seeing_eye.shortest_path import Graph
 from stretch_seeing_eye.Waypoint import Waypoint
 from stretch_seeing_eye.Door import Door
-from stretch_seeing_eye.feature import Feature, DetailLevel
 from stretch_seeing_eye.srv import Waypoint as WaypointSrv, WaypointRequest, WaypointResponse, GetWaypoints, GetWaypointsRequest, GetWaypointsResponse
 from stretch_seeing_eye.msg import WaypointDijkstra
-
-# class MoveBaseWaypointClient:
-#     def __init__(self):
-#         self.pathClient = actionlib.SimpleActionClient(
-#             '/mbf_costmap_nav/get_path', GetPathAction)
-#         self.exePathClient = actionlib.SimpleActionClient(
-#             '/mbf_costmap_nav/exe_path', ExePathAction)
-
-#         self.path_complete = False
-#         self.paths = []
-#         self.pub = rospy.Publisher(
-#             '/test_path', Path, queue_size=10)
-#         self.pub2 = rospy.Publisher(
-#             '/test_pose', PoseArray, queue_size=10)
-#         self.pathClient.wait_for_server()
-#         rospy.logdebug('connected to mbf server')
-
-#     def navigate_waypoints(self, points: list, angle=None):
-#         self.points = points
-#         self.path_complete = False
-#         self.paths = []
-#         trajectory = ExePathGoal()
-#         trajectory.path.header.frame_id = 'map'
-#         trajectory.path.poses = []
-#         trajectory.tolerance_from_action = True
-#         trajectory.dist_tolerance = 0.1
-#         trajectory.angle_tolerance = 6.28
-
-#         # Get path
-#         for i, point in enumerate(points):
-#             goal = GetPathGoal()
-#             if i == 0:
-#                 goal.use_start_pose = False
-#                 goal.target_pose = point
-#                 self.pathClient.send_goal(goal)
-#                 self.pathClient.wait_for_result()
-#                 result = self.pathClient.get_result()
-#                 if result is not None:
-#                     trajectory.path.poses = result.path.poses
-#                     # trajectory.path.poses.pop()
-#                     self.paths.append(
-#                         self.calculateLength(trajectory.path.poses))
-#                 continue
-#             goal.use_start_pose = True
-#             goal.start_pose = trajectory.path.poses[-1]
-#             goal.target_pose = point
-#             self.pathClient.send_goal(goal)
-#             self.pathClient.wait_for_result()
-#             result = self.pathClient.get_result()
-#             if result is not None:
-#                 # result.path.poses.pop()
-#                 self.paths.append(self.calculateLength(result.path.poses))
-#                 trajectory.path.poses.extend(result.path.poses)
-#         # end path
-#         # Debug path
-#         for i, pose in enumerate(trajectory.path.poses):
-#             pose.pose.orientation = Quaternion(0, 0, 0, 1)
-#         if angle is not None:
-#             trajectory.path.poses[-1].pose.orientation = Quaternion(
-#                 *quaternion_from_euler(0, 0, angle))
-#         self.pub.publish(trajectory.path)
-#         self.pub2.publish(PoseArray(header=Header(frame_id='map'), poses=[
-#                           p.pose for p in trajectory.path.poses]))
-#         self.paths.reverse()
-#         for i, length in enumerate(self.paths):
-#             if i == 0:
-#                 continue
-#             self.paths[i] += self.paths[i-1]
-#         rospy.logdebug(self.paths)
-#         self.exePathClient.send_goal(
-#             trajectory, done_cb=self.done, feedback_cb=self.feedback_cb)
-
-#     def feedback_cb(self, feedback: ExePathFeedback):
-#         if len(self.paths) > 0 and feedback.dist_to_goal < self.paths[-1]:
-#             self.paths.pop()
-#             self.points = self.points[1:]
-
-#     def done(self, status, result):
-#         self.path_complete = True
-
-#     def pause(self):
-#         self.exePathClient.cancel_goal()
-
-#     def resume(self):
-#         self.navigate_waypoints(self.points)
-
-#     def calculateLength(self, path):
-#         length = 0
-#         for i in range(1, len(path)):
-#             length += math.sqrt((path[i].pose.position.x - path[i-1].pose.position.x)**2 +
-#                                 (path[i].pose.position.y - path[i-1].pose.position.y)**2)
-#         return length
 
 
 def get_PoseStamped(data):
@@ -129,30 +32,19 @@ def distance(p1: PoseStamped, p2: PoseStamped) -> float:
 class NavigateWaypoint:
     def __init__(self):
         # Publishers and Subscribers
-        # self.test_client = MoveBaseWaypointClient()
-        self.move_pub = rospy.Publisher(
-            '/move_base_simple/goal', PoseStamped, queue_size=10)
-        self.waypoint_rviz_pub = rospy.Publisher(
-            '/visualization_marker_array', MarkerArray, queue_size=10)
-        self.move_base_cancel_pub = rospy.Publisher(
-            '/move_base/cancel', GoalID, queue_size=1)
-        self.waypoint_pub = rospy.Publisher(
-            '/move_base/WaypointGlobalPlanner/waypoint', WaypointDijkstra, queue_size=1)
+        self.move_base_goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
+        self.move_base_cancel_pub = rospy.Publisher('/move_base/cancel', GoalID, queue_size=1)
+        self.waypoint_rviz_pub = rospy.Publisher('/visualization_marker_array', MarkerArray, queue_size=10)
+        self.waypoint_pub = rospy.Publisher('/move_base/WaypointGlobalPlanner/waypoint', WaypointDijkstra, queue_size=1)  # Publish adjacency matrix
 
-        self.set_curr_waypoint_sub = rospy.Subscriber(
-            '/stretch_seeing_eye/set_curr_waypoint', String, self.set_curr_waypoint_callback, queue_size=1)
-        self.set_max_vel_sub = rospy.Subscriber(
-            '/stretch_seeing_eye/set_max_vel', Float32, self.set_max_vel_callback, queue_size=1)
+        self.move_base_status_sub = rospy.Subscriber('/move_base/status', GoalStatusArray, self.move_base_status_callback, queue_size=1)
+        self.set_max_vel_sub = rospy.Subscriber('/stretch_seeing_eye/set_max_vel', Float32, self.set_max_vel_callback, queue_size=1)
 
-        self.navigate_to_waypoint_service = rospy.Service(
-            '/stretch_seeing_eye/navigate_to_waypoint', WaypointSrv, self.navigate_to_waypoint)
-        self.get_waypoints_service = rospy.Service(
-            '/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
-        self.pause_navigation_service = rospy.Service(
-            '/stretch_seeing_eye/pause_navigation', SetBool, self.pause_navigation_callback)
+        self.navigate_to_waypoint_service = rospy.Service('/stretch_seeing_eye/navigate_to_waypoint', WaypointSrv, self.navigate_to_waypoint)
+        self.get_waypoints_service = rospy.Service('/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
+        self.stop_navigation_service = rospy.Service('/stretch_seeing_eye/stop_navigation', Trigger, self.stop_navigation_callback)
 
-        # self.client = client.Client(
-        #     '/mbf_costmap_nav/DWAPlannerROS', timeout=30, config_callback=None)
+        self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
 
         self.moving = False
@@ -161,9 +53,8 @@ class NavigateWaypoint:
 
         self.waypoints = {}
         self.doors = {}
-        self.features = {}
-        self.curr_feature = 'Base'
-        self.curr_goal = None
+        self.goals = {}
+
         try:
             self.import_data(rospy.get_param(
                 '/description_file'))  # type: ignore
@@ -171,22 +62,19 @@ class NavigateWaypoint:
             rospy.logerr(e)
             exit(1)
 
+    def move_base_status_callback(self, msg: GoalStatusArray):
+        if len(msg.status_list) and msg.status_list[-1].status == 1:  # type: ignore
+            self.moving = True
+        else:
+            self.moving = False
+
     def set_max_vel_callback(self, msg: Float32):
         self.max_val = msg.data
         self.update_move_base('max_vel_x', self.max_val)
 
-    def pause_navigation_callback(self, msg: SetBoolRequest):
-        self.pause = msg.data
-        if self.pause:
-            self.test_client.pause()
-            return SetBoolResponse(True, 'Paused navigation')
-        else:
-            rospy.logdebug('Resuming navigation')
-            self.test_client.resume()
-            return SetBoolResponse(True, 'Resumed navigation')
-
-    def set_curr_waypoint_callback(self, msg: String):
-        self.curr_feature = msg.data
+    def stop_navigation_callback(self, msg: TriggerRequest):
+        self.move_base_cancel_pub.publish(GoalID())
+        return TriggerResponse(success=True)
 
     def import_data(self, file: str):
         count = 0
@@ -195,7 +83,6 @@ class NavigateWaypoint:
         with open(file, 'r') as f:
             data = f.read()
             for line in data.split('\n'):
-                rospy.logdebug(line)
                 if line == "":
                     continue
                 elif line.startswith('Door'):
@@ -205,14 +92,21 @@ class NavigateWaypoint:
                     markers.append(self.create_marker(
                         d.entrance_pose, d.id, ColorRGBA(1.0, 0.0, 0.0, 1.0)))
                     if d.inside:
+                        q = quaternion_from_euler(0, 0, math.atan2(d.inside_pose.pose.position.y - d.entrance_pose.pose.position.y, d.inside_pose.pose.position.x - d.entrance_pose.pose.position.x))
+                        d.entrance_pose.pose.orientation = Quaternion(q[0], q[1], q[2], q[3])
+                        self.goals[d.name + ' Inside'] = d.inside_pose
+                        self.goals[d.name + ' Entrance'] = d.entrance_pose
                         count += 1
                         markers.append(self.create_marker(
-                            d.inside_pose, d.id, ColorRGBA(1.0, 0.0, 0.0, 1.0)))
+                            d.inside_pose, -d.id, ColorRGBA(1.0, 0.0, 0.0, 1.0)))
+                    else:
+                        self.goals[d.name] = d.entrance_pose
                 elif line.startswith('Waypoint'):
                     w = Waypoint(line)
                     self.waypoints[w.id] = w
                     count += 1
                     markers.append(self.create_marker(w.poseStamped, w.id))
+                    self.goals[w.name] = w.poseStamped
         self.waypoint_rviz_pub.publish(MarkerArray(markers=markers))
 
         # Create graph
@@ -251,53 +145,41 @@ class NavigateWaypoint:
         msg.graph = [Float32(data=v) for row in adjacency_matrix for v in row]
         self.waypoint_pub.publish(msg)
 
-    def navigate(self, waypoint: str = 'Base'):
-        rospy.logdebug('Navigating to ' + waypoint)
-        rospy.logdebug(self.waypoints[waypoint])
-
-        self.curr_goal = waypoint
-        self.move_pub.publish(self.waypoints[waypoint].poseStamped)
-        rospy.logdebug('Published')
-
     def navigate_to_waypoint(self, msg: WaypointRequest):
-        goal = msg.data
-        if goal not in self.features.keys():
-            rospy.logdebug('Feature unknown')
+        if msg.data is None or msg.data == '':
             return WaypointResponse()
 
-        start = self.lookup_table[self.features[self.curr_feature]['waypoint']]
-        end = self.lookup_table[self.features[goal]['waypoint']]
-        rospy.logdebug('Start: ' + str(start) + ' End: ' + str(end))
+        goal = msg.data
+        if goal not in self.goals.keys():
+            rospy.logdebug('Goal unknown')
+            return WaypointResponse()
 
-        waypoints = list(
-            map(lambda x: self.lookup_table_reverse[x], self.graph.dijkstra(start, end)))
-        waypoints.append(self.features[goal]['waypoint'])
-        rospy.logdebug(waypoints)
-
-        door = False
         inside = False
-
         if 'Entrance' in goal:
-            door = True
-
+            self.update_move_base('yaw_goal_tolerance', 0.05)
+            goal_pose = self.goals[goal]
         elif 'Inside' in goal:
-            door = True
+            self.update_move_base('yaw_goal_tolerance', 0.05)
             inside = True
+            goal_pose = self.goals[goal.replace('Inside', 'Entrance')]
+        else:
+            self.update_move_base('yaw_goal_tolerance', 6.28)
+            goal_pose = self.goals[goal]
 
-        points = [self.waypoints[w].poseStamped for w in waypoints]
+        self.move_base_goal_pub.publish(goal_pose)
+        rospy.sleep(2)
+        while self.moving:
+            rospy.sleep(1)
+
         if inside:
-            points.pop()
-        self.test_client.navigate_waypoints(points)
-        while not self.test_client.path_complete:
-            rospy.sleep(0.1)
-        if door:
-            door_open = True
-            rospy.logdebug('Door')
-            if door_open and inside:
-                self.test_client.navigate_waypoints(
-                    [self.waypoints[waypoints[-1].poseStamped]])
-        self.curr_feature = goal
-        rospy.logdebug('Reached ' + goal)
+            # Check for door
+            rospy.logdebug('Checking for door')
+            self.update_move_base('yaw_goal_tolerance', 6.28)
+            self.move_base_goal_pub.publish(self.goals[goal])
+            rospy.sleep(2)
+            while self.moving:
+                rospy.sleep(1)
+
         return WaypointResponse()
 
     def update_move_base(self, key: str, value: any):
@@ -316,9 +198,7 @@ class NavigateWaypoint:
         return m
 
     def get_waypoints_callback(self, req: GetWaypointsRequest):
-        arr = [self.features[key]['name'] for key in self.features.keys()]
-        arr.sort()
-        return GetWaypointsResponse(waypoints=arr)
+        return GetWaypointsResponse(waypoints=[key for key in self.goals.keys()])
 
 
 if __name__ == '__main__':
