@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Odometry1/Shape1
+        - /Path1
       Splitter Ratio: 0.6117647290229797
     Tree Height: 1098
   - Class: rviz/Selection
@@ -523,7 +524,7 @@ Visualization Manager:
       Radius: 0.029999999329447746
       Shaft Diameter: 0.10000000149011612
       Shaft Length: 0.10000000149011612
-      Topic: /test_path
+      Topic: /move_base/WaypointGlobalPlanner/plan
       Unreliable: false
       Value: true
   Enabled: true
@@ -591,4 +592,4 @@ Window Geometry:
     collapsed: false
   Width: 1274
   X: 2564
-  Y: 4
+  Y: 0

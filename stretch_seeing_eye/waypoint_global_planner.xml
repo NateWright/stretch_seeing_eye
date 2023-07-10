@@ -1,0 +1,5 @@
+ <library path="lib/libwaypoint_planner_lib">
+  <class name="waypoint_global_planner/WaypointGlobalPlanner" type="waypoint_global_planner::WaypointGlobalPlanner" base_class_type="nav_core::BaseGlobalPlanner">
+    <description>Waypoint planner.</description>
+  </class>
+ </library>

@@ -22,6 +22,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   tf2_msgs
   tf2_sensor_msgs
+  global_planner
+  nav_core
 )
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
@@ -65,6 +67,7 @@ add_message_files(
   FILES
   Door.msg
   Tracking.msg
+  WaypointDijkstra.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -132,7 +135,7 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include/${PROJECT_NAME}
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
@@ -140,9 +143,9 @@ include_directories(
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/stretch_seeing_eye.cpp
-# )
+add_library(waypoint_planner_lib
+  src/${PROJECT_NAME}/WaypointGlobalPlanner.cpp
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -173,6 +176,9 @@ add_dependencies(save_pcd ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_
 add_dependencies(test_pcd_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
+target_link_libraries(waypoint_planner_lib
+  ${catkin_LIBRARIES}
+)
 target_link_libraries(publish_plane_node
   ${catkin_LIBRARIES}
 )
