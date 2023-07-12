@@ -28,6 +28,9 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <std_srvs/Trigger.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 
 #include <algorithm>
 #include <iterator>
@@ -71,14 +74,14 @@ Point averageCloud(const PointCloud::Ptr &cloud) {
 
 class DoorDetector {
    public:
-    DoorDetector(ros::NodeHandlePtr nh) : nh(nh) {
+    DoorDetector(ros::NodeHandlePtr nh) : nh(nh), tfListener(tfBuffer) {
         // cloudSub = nh->subscribe("/test_pointcloud", 1, &DoorDetector::door_detection, this);
         // imageSub = nh->subscribe("/test_image", 1, &DoorDetector::door_detection_image, this);
 
-        service = nh->advertiseService("/stretch_seeing_eye/detect_door", &DoorDetector::door_detection_srv, this);
+        service = nh->advertiseService("/stretch_seeing_eye/detect_door_open", &DoorDetector::door_detection_srv, this);
 
-        testCloudPub = nh->advertise<PointCloud>("/test_pcd", 1);
-        testHullPub = nh->advertise<PointCloud>("/test_hull", 1);
+        testCloudPub = nh->advertise<PointCloud>("/stretch_seeing_eye/door_detector/test_pcd", 1);
+        testHullPub = nh->advertise<PointCloud>("/stretch_seeing_eye/door_detector/test_hull", 1);
 
         testImagePub = nh->advertise<sensor_msgs::Image>("/test_img", 1);
         visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("base_link", "/rviz_visual_markers"));
@@ -90,7 +93,9 @@ class DoorDetector {
             res.success = false;
             return true;
         }
-        res.success = door_detection(pc);
+        door_detection(pc);
+        res.success = door;
+        res.message = message;
         return true;
     }
 
@@ -120,17 +125,20 @@ class DoorDetector {
     //     testImagePub.publish(cv_ptr->toImageMsg());
     // }
 
-    bool door_detection(const PointCloud::ConstPtr &cloud) {
-        PointCloud::Ptr voxel_cloud = voxelize_cloud(cloud);
+    void door_detection(const PointCloud::ConstPtr &cloud) {
+        PointCloud::Ptr cloudTransformed(new PointCloud);
+        const geometry_msgs::TransformStamped transformStamped = tfBuffer.lookupTransform("base_link", cloud->header.frame_id, ros::Time(0));
+        pcl_ros::transformPointCloud(*cloud, *cloudTransformed, transformStamped.transform);
+        cloudTransformed->header.frame_id = "base_link";
+        PointCloud::Ptr voxel_cloud = voxelize_cloud(cloudTransformed);
         PointCloud::Ptr distance_cloud = filterDistance(voxel_cloud);
-        bool b = findWall(distance_cloud);
+        findWall(distance_cloud);
         // Point p = averageCloud(wall_cloud);
         // ROS_INFO_STREAM(p);
         // float distance = distancePointToPlane(p, plane_parameters);
         // ROS_INFO_STREAM(distance);
 
         // testCloudPub.publish(wall_cloud);
-        return b;
     }
 
     PointCloud::Ptr voxelize_cloud(const PointCloud::ConstPtr &cloud) {
@@ -147,7 +155,7 @@ class DoorDetector {
         pcl::PassThrough<Point> pass;
         pass.setInputCloud(cloud);
         pass.setFilterFieldName("z");
-        pass.setFilterLimits(0.1, 3);
+        pass.setFilterLimits(0.2, 3);
         pass.filter(*indices);
 
         pcl::ExtractIndices<Point> extract;
@@ -156,7 +164,7 @@ class DoorDetector {
         extract.filter(*segmented_cloud);
         return segmented_cloud;
     }
-    bool findWall(const PointCloud::ConstPtr &cloud) {
+    void findWall(const PointCloud::ConstPtr &cloud) {
         pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
         pcl::PointIndices::Ptr inliers(new pcl::PointIndices);  // Set of points in the plane
         pcl::SACSegmentation<Point> seg;
@@ -193,7 +201,9 @@ class DoorDetector {
 
         if (polygons.size() == 0) {
             ROS_ERROR_STREAM("No polygons found");
-            return false;
+            message = "No polygons found";
+            door = false;
+            return;
         }
         pcl::Vertices v = polygons[0];
         std::vector<std::vector<Point>> lines;
@@ -256,13 +266,17 @@ class DoorDetector {
         ROS_INFO_STREAM("line count: " << lines.size());
         if (directions.size() != lines.size()) {
             ROS_ERROR_STREAM("directions and lines size mismatch");
-            return false;
+            message = "directions and lines size mismatch";
+            door = false;
+            return;
         }
         for (size_t i = 0; i < directions.size() - 2; i++) {
             if (directions[i] == Direction::UP && (directions[i + 1] == Direction::RIGHT || directions[i + 1] == Direction::LEFT) &&
                 directions[i + 2] == Direction::DOWN) {
                 ROS_INFO_STREAM("Found door");
-                return true;
+                message = "Found door";
+                door = true;
+                return;
                 for (size_t j = i; j < i + 3; j++) {
                     geometry_msgs::Point p1, p2;
                     p1.x = lines[j][0].x;
@@ -292,7 +306,10 @@ class DoorDetector {
         // pcl::copyPointCloud(*cloud, indices, *wall_cloud);
 
         // return wall_cloud;
-        return false;
+        testCloudPub.publish(wall_cloud);
+        message = "No door found from hull";
+        door = false;
+        return;
     }
 
    private:
@@ -307,6 +324,11 @@ class DoorDetector {
     ros::Publisher testHullPub;
     ros::Publisher testImagePub;
 
+    tf2_ros::Buffer tfBuffer;
+    tf2_ros::TransformListener tfListener;
+
+    bool door;
+    std::string message;
     Vector4f plane_parameters;
     rviz_visual_tools::RvizVisualToolsPtr visual_tools_;
 };

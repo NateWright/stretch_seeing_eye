@@ -34,6 +34,11 @@ bool WaypointGlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start,
     }
     size_t current_waypoint = closestWaypoint(start);
     size_t goal_waypoint = closestWaypoint(goal);
+    if (current_waypoint == goal_waypoint) {
+        plan.push_back(start);
+        plan.push_back(goal);
+        return true;
+    }
     vector<int> path = dijkstra.DijkstraAlgo(current_waypoint, goal_waypoint);
     path.push_back(goal_waypoint);
     std::vector<geometry_msgs::PoseStamped> points;

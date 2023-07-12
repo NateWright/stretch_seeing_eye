@@ -7,7 +7,7 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from actionlib_msgs.msg import GoalStatusArray, GoalID
 from dynamic_reconfigure import client
 from visualization_msgs.msg import Marker, MarkerArray
-from std_msgs.msg import ColorRGBA, Float32
+from std_msgs.msg import ColorRGBA, Float32, String
 from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
 
 from stretch_seeing_eye.Waypoint import Waypoint
@@ -36,6 +36,7 @@ class NavigateWaypoint:
         self.move_base_cancel_pub = rospy.Publisher('/move_base/cancel', GoalID, queue_size=1)
         self.waypoint_rviz_pub = rospy.Publisher('/visualization_marker_array', MarkerArray, queue_size=10)
         self.waypoint_pub = rospy.Publisher('/move_base/WaypointGlobalPlanner/waypoint', WaypointDijkstra, queue_size=1)  # Publish adjacency matrix
+        self.message_pub = rospy.Publisher('/stretch_seeing_eye/message', String, queue_size=10)
 
         self.move_base_status_sub = rospy.Subscriber('/move_base/status', GoalStatusArray, self.move_base_status_callback, queue_size=1)
         self.set_max_vel_sub = rospy.Subscriber('/stretch_seeing_eye/set_max_vel', Float32, self.set_max_vel_callback, queue_size=1)
@@ -43,6 +44,7 @@ class NavigateWaypoint:
         self.navigate_to_waypoint_service = rospy.Service('/stretch_seeing_eye/navigate_to_waypoint', WaypointSrv, self.navigate_to_waypoint)
         self.get_waypoints_service = rospy.Service('/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
         self.stop_navigation_service = rospy.Service('/stretch_seeing_eye/stop_navigation', Trigger, self.stop_navigation_callback)
+        self.check_door_service = rospy.ServiceProxy('/stretch_seeing_eye/detect_door_open', Trigger)
 
         self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
@@ -94,6 +96,8 @@ class NavigateWaypoint:
                     if d.inside:
                         q = quaternion_from_euler(0, 0, math.atan2(d.inside_pose.pose.position.y - d.entrance_pose.pose.position.y, d.inside_pose.pose.position.x - d.entrance_pose.pose.position.x))
                         d.entrance_pose.pose.orientation = Quaternion(q[0], q[1], q[2], q[3])
+                        q = quaternion_from_euler(0, 0, math.atan2(d.entrance_pose.pose.position.y - d.inside_pose.pose.position.y, d.entrance_pose.pose.position.x - d.inside_pose.pose.position.x))
+                        d.inside_pose.pose.orientation = Quaternion(q[0], q[1], q[2], q[3])
                         self.goals[d.name + ' Inside'] = d.inside_pose
                         self.goals[d.name + ' Entrance'] = d.entrance_pose
                         count += 1
@@ -158,13 +162,16 @@ class NavigateWaypoint:
         if 'Entrance' in goal:
             self.update_move_base('yaw_goal_tolerance', 0.05)
             goal_pose = self.goals[goal]
+            self.message_pub.publish(String(data='Navigating to ' + goal))
         elif 'Inside' in goal:
             self.update_move_base('yaw_goal_tolerance', 0.05)
             inside = True
             goal_pose = self.goals[goal.replace('Inside', 'Entrance')]
+            self.message_pub.publish(String(data='Navigating to ' + goal.replace('Inside', 'Entrance') + ' and then through the door if open'))
         else:
             self.update_move_base('yaw_goal_tolerance', 6.28)
             goal_pose = self.goals[goal]
+            self.message_pub.publish(String(data='Navigating to ' + goal))
 
         self.move_base_goal_pub.publish(goal_pose)
         rospy.sleep(2)
@@ -174,15 +181,22 @@ class NavigateWaypoint:
         if inside:
             # Check for door
             rospy.logdebug('Checking for door')
-            self.update_move_base('yaw_goal_tolerance', 6.28)
-            self.move_base_goal_pub.publish(self.goals[goal])
-            rospy.sleep(2)
-            while self.moving:
-                rospy.sleep(1)
+            req = TriggerRequest()
+            res = self.check_door_service(req)
+            if res.success:
+                rospy.logdebug('Door open')
+                self.message_pub.publish(String(data='Proceeding through door'))
+                self.move_base_goal_pub.publish(self.goals[goal])
+                rospy.sleep(2)
+                while self.moving:
+                    rospy.sleep(1)
+            else:
+                rospy.logdebug('Door closed')
+                self.message_pub.publish(String(data='Door closed'))
 
         return WaypointResponse()
 
-    def update_move_base(self, key: str, value: any):
+    def update_move_base(self, key: str, value: any):  # type: ignore
         self.client.update_configuration({key: value})
 
     def create_marker(self, poseStamped: PoseStamped, count: int, color: ColorRGBA = ColorRGBA(0.0, 1.0, 0.0, 1.0)):
