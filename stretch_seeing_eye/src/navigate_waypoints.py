@@ -1,5 +1,6 @@
 import rospy
 import math
+import tf2_ros
 
 from tf.transformations import quaternion_from_euler
 from std_msgs.msg import Float32
@@ -16,17 +17,8 @@ from stretch_seeing_eye.srv import Waypoint as WaypointSrv, WaypointRequest, Way
 from stretch_seeing_eye.msg import WaypointDijkstra
 
 
-def get_PoseStamped(data):
-    if isinstance(data, Waypoint):
-        return data.poseStamped
-    elif isinstance(data, Door):
-        return data.entrance_pose
-    return None
-
-
 def distance(p1: PoseStamped, p2: PoseStamped) -> float:
-    return math.sqrt((p1.pose.position.x - p2.pose.position.x)**2 +
-                     (p1.pose.position.y - p2.pose.position.y)**2)
+    return math.hypot(p1.pose.position.x - p2.pose.position.x, p1.pose.position.y - p2.pose.position.y)
 
 
 class NavigateWaypoint:
@@ -49,6 +41,9 @@ class NavigateWaypoint:
         self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
 
+        self.tfBuffer = tf2_ros.Buffer()
+        self.tfListener = tf2_ros.TransformListener(self.tfBuffer)
+
         self.moving = False
         self.pause = False
         self.max_val = 0.3
@@ -58,11 +53,29 @@ class NavigateWaypoint:
         self.goals = {}
 
         try:
-            self.import_data(rospy.get_param(
-                '/description_file'))  # type: ignore
+            self.import_data(rospy.get_param('/description_file'))  # type: ignore
         except Exception as e:
             rospy.logerr(e)
             exit(1)
+
+    def check_points(self):
+        try:
+            transform: tf2_ros.TransformStamped = self.tfBuffer.lookup_transform('map', 'base_link', rospy.Time())
+        except Exception as e:
+            rospy.logerr(e)
+            return
+        adjacency_matrix = self.adjacency_matrix['adjacency_matrix']
+        points = self.adjacency_matrix['points']
+        lookup_table = self.adjacency_matrix['lookup_table']  # id -> index
+        reverse_lookup_table = self.adjacency_matrix['reverse_lookup_table']  # index -> id
+        for i, p in enumerate(points):
+            d = math.hypot(p.pose.position.x - transform.transform.translation.x, p.pose.position.y - transform.transform.translation.y)
+            if d < 1:
+                for index in adjacency_matrix[i]:
+                    if index in reverse_lookup_table.keys():
+                        id = reverse_lookup_table[index]
+                        if id in self.doors:
+                            rospy.logdebug('Near door ' + self.doors[id].name)
 
     def move_base_status_callback(self, msg: GoalStatusArray):
         if len(msg.status_list) and msg.status_list[-1].status == 1:  # type: ignore
@@ -147,6 +160,12 @@ class NavigateWaypoint:
         msg = WaypointDijkstra()
         msg.waypoints = points
         msg.graph = [Float32(data=v) for row in adjacency_matrix for v in row]
+        self.adjacency_matrix = {
+            'points': points,
+            'lookup_table': lookup_table,  # id -> index
+            'reverse_lookup_table': {index: id for id, index in lookup_table.items()},  # index -> id
+            'adjacency_matrix': [[i for i, v in enumerate(row) if v > 0] for row in adjacency_matrix],
+        }
         self.waypoint_pub.publish(msg)
 
     def navigate_to_waypoint(self, msg: WaypointRequest):
@@ -176,7 +195,8 @@ class NavigateWaypoint:
         self.move_base_goal_pub.publish(goal_pose)
         rospy.sleep(2)
         while self.moving:
-            rospy.sleep(1)
+            self.check_points()
+            rospy.sleep(0.1)
 
         if inside:
             # Check for door
@@ -189,7 +209,7 @@ class NavigateWaypoint:
                 self.move_base_goal_pub.publish(self.goals[goal])
                 rospy.sleep(2)
                 while self.moving:
-                    rospy.sleep(1)
+                    rospy.sleep(0.1)
             else:
                 rospy.logdebug('Door closed')
                 self.message_pub.publish(String(data='Door closed'))
