@@ -8,13 +8,13 @@ from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from actionlib_msgs.msg import GoalStatusArray, GoalID
 from dynamic_reconfigure import client
 from visualization_msgs.msg import Marker, MarkerArray
-from std_msgs.msg import ColorRGBA, Float32, String
+from std_msgs.msg import ColorRGBA, Float32, String, UInt32
 from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
 
 from stretch_seeing_eye.Waypoint import Waypoint
 from stretch_seeing_eye.Door import Door
 from stretch_seeing_eye.srv import Waypoint as WaypointSrv, WaypointRequest, WaypointResponse, GetWaypoints, GetWaypointsRequest, GetWaypointsResponse
-from stretch_seeing_eye.msg import WaypointDijkstra
+from stretch_seeing_eye.msg import WaypointDijkstra, Door as DoorMsg
 
 
 def distance(p1: PoseStamped, p2: PoseStamped) -> float:
@@ -23,34 +23,36 @@ def distance(p1: PoseStamped, p2: PoseStamped) -> float:
 
 class NavigateWaypoint:
     def __init__(self):
+        self.tfBuffer = tf2_ros.Buffer()
+        self.tfListener = tf2_ros.TransformListener(self.tfBuffer)
+
+        self.moving = False
+        self.pause = False
+        self.max_vel = 0.3
+        self.scaling_factor = 1.0
+
+        self.waypoints = {}
+        self.doors = {}
+        self.goals = {}
+
         # Publishers and Subscribers
         self.move_base_goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
         self.move_base_cancel_pub = rospy.Publisher('/move_base/cancel', GoalID, queue_size=1)
         self.waypoint_rviz_pub = rospy.Publisher('/visualization_marker_array', MarkerArray, queue_size=10)
         self.waypoint_pub = rospy.Publisher('/move_base/WaypointGlobalPlanner/waypoint', WaypointDijkstra, queue_size=1)  # Publish adjacency matrix
         self.message_pub = rospy.Publisher('/stretch_seeing_eye/message', String, queue_size=10)
+        self.door_msg_pub = rospy.Publisher('/stretch_seeing_eye/door', DoorMsg, queue_size=10)
 
         self.move_base_status_sub = rospy.Subscriber('/move_base/status', GoalStatusArray, self.move_base_status_callback, queue_size=1)
         self.set_max_vel_sub = rospy.Subscriber('/stretch_seeing_eye/set_max_vel', Float32, self.set_max_vel_callback, queue_size=1)
+        self.handle_sub = rospy.Subscriber('/stretch_seeing_eye/handle_reading', UInt32, self.handle_callback, queue_size=1)
 
         self.navigate_to_waypoint_service = rospy.Service('/stretch_seeing_eye/navigate_to_waypoint', WaypointSrv, self.navigate_to_waypoint)
         self.get_waypoints_service = rospy.Service('/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
         self.stop_navigation_service = rospy.Service('/stretch_seeing_eye/stop_navigation', Trigger, self.stop_navigation_callback)
         self.check_door_service = rospy.ServiceProxy('/stretch_seeing_eye/detect_door_open', Trigger)
-
         self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
-
-        self.tfBuffer = tf2_ros.Buffer()
-        self.tfListener = tf2_ros.TransformListener(self.tfBuffer)
-
-        self.moving = False
-        self.pause = False
-        self.max_val = 0.3
-
-        self.waypoints = {}
-        self.doors = {}
-        self.goals = {}
 
         try:
             self.import_data(rospy.get_param('/description_file'))  # type: ignore
@@ -75,7 +77,9 @@ class NavigateWaypoint:
                     if index in reverse_lookup_table.keys():
                         id = reverse_lookup_table[index]
                         if id in self.doors:
-                            rospy.logdebug('Near door ' + self.doors[id].name)
+                            message = 'Near ' + self.doors[id].name
+                            self.door_msg_pub.publish(DoorMsg(detail_level=self.doors[id].detail_level, data=message))
+                            rospy.logdebug(message)
 
     def move_base_status_callback(self, msg: GoalStatusArray):
         if len(msg.status_list) and msg.status_list[-1].status == 1:  # type: ignore
@@ -84,8 +88,26 @@ class NavigateWaypoint:
             self.moving = False
 
     def set_max_vel_callback(self, msg: Float32):
-        self.max_val = msg.data
-        self.update_move_base('max_vel_x', self.max_val)
+        self.max_vel = msg.data
+        self.update_move_base('max_vel_x', self.max_vel * self.scaling_factor)
+
+    def handle_callback(self, msg: UInt32):
+        low = 0
+        high = 1000
+        raw_val = (msg.data - low) / (high - low)
+        if raw_val < 0.2:
+            val = 0
+        elif raw_val < 0.4:
+            val = raw_val
+        elif raw_val < 0.6:
+            val = 1
+        elif raw_val < 0.8:
+            val = 1 + (raw_val - 0.6)
+        else:
+            val = 2
+        if abs(self.scaling_factor - val) > 0.01:
+            self.scaling_factor = val
+            self.update_move_base('max_vel_x', self.max_vel * self.scaling_factor)
 
     def stop_navigation_callback(self, msg: TriggerRequest):
         self.move_base_cancel_pub.publish(GoalID())
