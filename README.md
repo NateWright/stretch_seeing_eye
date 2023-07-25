@@ -16,5 +16,10 @@ rviz -d `rospack find stretch_seeing_eye`/rviz/navigation.rviz
 ```
 
 ```bash
-rosrun rosserial_python serial_node.py /dev/ttyACM0
+rosrun rosserial_python serial_node.py /dev/stretch-handle
+```
+
+udev rules
+```txt
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="2a03", GROUP="plugdev", MODE="0666", SYMLINK+="stretch-handle"
 ```
