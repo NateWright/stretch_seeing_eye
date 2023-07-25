@@ -1,0 +1,5 @@
+<library path="lib/libdwa_plus_local_planner_lib">
+    <class name="local_planner/DWAPlusPlannerROS" type="local_planner::DWAPlusPlannerROS" base_class_type="nav_core::BaseLocalPlanner">
+        <description>Simplest Plugin for BaseLocalPlanner</description>
+    </class>
+</library>

@@ -264,6 +264,8 @@ class DoorDetector {
         //         visual_tools_->publishLine(p1, p2, rviz_visual_tools::GREEN, rviz_visual_tools::MEDIUM);
         // }
         ROS_INFO_STREAM("line count: " << lines.size());
+        testHullPub.publish(wall_hull);
+        testCloudPub.publish(wall_cloud);
         if (directions.size() != lines.size()) {
             ROS_ERROR_STREAM("directions and lines size mismatch");
             message = "directions and lines size mismatch";
@@ -291,7 +293,6 @@ class DoorDetector {
             }
         }
         visual_tools_->trigger();
-        testHullPub.publish(wall_hull);
 
         // Picks out points behind plane
         // pcl::PlaneClipper3D<Point> clipper(plane_parameters);
@@ -306,7 +307,6 @@ class DoorDetector {
         // pcl::copyPointCloud(*cloud, indices, *wall_cloud);
 
         // return wall_cloud;
-        testCloudPub.publish(wall_cloud);
         message = "No door found from hull";
         door = false;
         return;

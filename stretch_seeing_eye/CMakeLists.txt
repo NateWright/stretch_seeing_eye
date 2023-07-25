@@ -24,6 +24,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_sensor_msgs
   global_planner
   nav_core
+  dwa_local_planner
 )
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
@@ -146,6 +147,8 @@ include_directories(
 add_library(waypoint_planner_lib
   src/${PROJECT_NAME}/WaypointGlobalPlanner.cpp
 )
+add_library(dwa_plus_local_planner_lib
+  src/${PROJECT_NAME}/DWAPlusLocalPlanner.cpp)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -177,6 +180,9 @@ add_dependencies(test_pcd_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPO
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(waypoint_planner_lib
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(dwa_plus_local_planner_lib
   ${catkin_LIBRARIES}
 )
 target_link_libraries(publish_plane_node
