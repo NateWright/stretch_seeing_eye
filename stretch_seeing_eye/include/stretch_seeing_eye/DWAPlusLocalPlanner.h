@@ -8,6 +8,7 @@
 #include <geometry_msgs/Twist.h>
 #include <nav_core/base_local_planner.h>
 #include <ros/ros.h>
+#include <tf2/utils.h>
 #include <tf2_ros/buffer.h>
 
 using namespace std;
@@ -29,9 +30,12 @@ class DWAPlusPlannerROS : public dwa_local_planner::DWAPlannerROS {
     bool isGoalReached();
 
    private:
-    // costmap_2d::Costmap2DROS* costmap_ros_;
-    // tf2_ros::Buffer* tf_;
-    // bool initialized_;
+    costmap_2d::Costmap2DROS* costmap_ros_;
+    tf2_ros::Buffer* tf_;
+    std::vector<geometry_msgs::PoseStamped> plan_;
+    bool rotate_;
+
+    double calculateYaw(geometry_msgs::PoseStamped robotPose);
 };
 };  // namespace local_planner
 
