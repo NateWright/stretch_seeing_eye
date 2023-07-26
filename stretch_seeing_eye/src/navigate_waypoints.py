@@ -51,7 +51,7 @@ class NavigateWaypoint:
         self.get_waypoints_service = rospy.Service('/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
         self.stop_navigation_service = rospy.Service('/stretch_seeing_eye/stop_navigation', Trigger, self.stop_navigation_callback)
         self.check_door_service = rospy.ServiceProxy('/stretch_seeing_eye/detect_door_open', Trigger)
-        self.client = client.Client('/move_base/DWAPlusPlannerROS', timeout=30, config_callback=None)
+        self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
 
         try:
