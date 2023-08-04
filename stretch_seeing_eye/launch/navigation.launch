@@ -1,9 +1,9 @@
 <launch>
 
   <arg name="rviz"     default="true" doc="whether to show Rviz" />
-  <arg name="location"/>
+  <!-- <arg name="location"/> -->
 
-  <arg name="map_yaml" value="$(find stretch_seeing_eye)/maps/$(arg location)/map.yaml"/>
+  <arg name="map_yaml"                                                   doc="filepath to previously captured map (required)" />
 
   <!-- STRETCH DRIVER -->
   <!-- <param name="/stretch_driver/broadcast_odom_tf" type="bool" value="true"/>
