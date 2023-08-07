@@ -13,7 +13,9 @@ from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
 
 from stretch_seeing_eye.Waypoint import Waypoint
 from stretch_seeing_eye.Door import Door
-from stretch_seeing_eye.srv import Waypoint as WaypointSrv, WaypointRequest, WaypointResponse, GetWaypoints, GetWaypointsRequest, GetWaypointsResponse
+from stretch_seeing_eye.srv import Waypoint as WaypointSrv, WaypointRequest, WaypointResponse
+from stretch_seeing_eye.srv import GetWaypoints, GetWaypointsRequest, GetWaypointsResponse
+from stretch_seeing_eye.srv import CheckClear, CheckClearRequest, CheckClearResponse
 from stretch_seeing_eye.msg import WaypointDijkstra, Door as DoorMsg
 
 
@@ -50,7 +52,7 @@ class NavigateWaypoint:
         self.navigate_to_waypoint_service = rospy.Service('/stretch_seeing_eye/navigate_to_waypoint', WaypointSrv, self.navigate_to_waypoint)
         self.get_waypoints_service = rospy.Service('/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
         self.stop_navigation_service = rospy.Service('/stretch_seeing_eye/stop_navigation', Trigger, self.stop_navigation_callback)
-        self.check_door_service = rospy.ServiceProxy('/stretch_seeing_eye/detect_door_open', Trigger)
+        self.check_door_service = rospy.ServiceProxy('/stretch_seeing_eye/detect_door_open', CheckClear)
         self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
 
@@ -223,7 +225,9 @@ class NavigateWaypoint:
         if inside:
             # Check for door
             rospy.logdebug('Checking for door')
-            req = TriggerRequest()
+            req = CheckClearRequest()
+            req.p1 = self.goals[goal.replace('Inside', 'Entrance')]
+            req.p2 = self.goals[goal]
             res = self.check_door_service(req)
             if res.success:
                 rospy.logdebug('Door open')
@@ -234,6 +238,7 @@ class NavigateWaypoint:
                     rospy.sleep(0.1)
             else:
                 rospy.logdebug('Door closed')
+                rospy.logdebug(res.message)
                 self.message_pub.publish(String(data='Door closed'))
 
         return WaypointResponse()

@@ -77,6 +77,7 @@ add_service_files(
   Feature.srv
   Waypoint.srv
   GetWaypoints.srv
+  CheckClear.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -159,7 +160,7 @@ add_library(dwa_plus_local_planner_lib
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(publish_plane_node src/publish_plane.cpp)
-add_executable(detect_door_node src/detect_door.cpp)
+add_executable(detect_door_node src/detect_door_simple.cpp)
 add_executable(test_image_node src/test_image_publisher.cpp)
 add_executable(save_pcd src/save_pointcloud.cpp)
 add_executable(test_pcd_node src/test_pointcloud_pub.cpp)
