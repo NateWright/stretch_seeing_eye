@@ -36,6 +36,7 @@ class NavigateWaypoint:
         self.waypoints = {}
         self.doors = {}
         self.goals = {}
+        self.nav_waypoints: list[str] = []
 
         # Publishers and Subscribers
         self.move_base_goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
@@ -137,17 +138,22 @@ class NavigateWaypoint:
                         d.inside_pose.pose.orientation = Quaternion(q[0], q[1], q[2], q[3])
                         self.goals[d.name + ' Inside'] = d.inside_pose
                         self.goals[d.name + ' Entrance'] = d.entrance_pose
+                        self.nav_waypoints.append(d.name + ' Inside')
+                        self.nav_waypoints.append(d.name + ' Entrance')
                         count += 1
                         markers.append(self.create_marker(
                             d.inside_pose, -d.id, ColorRGBA(1.0, 0.0, 0.0, 1.0)))
                     else:
                         self.goals[d.name] = d.entrance_pose
+                        self.nav_waypoints.append(d.name)
                 elif line.startswith('Waypoint'):
                     w = Waypoint(line)
                     self.waypoints[w.id] = w
                     count += 1
                     markers.append(self.create_marker(w.poseStamped, w.id))
                     self.goals[w.name] = w.poseStamped
+                    if w.navigatable:
+                        self.nav_waypoints.append(w.name)
         self.waypoint_rviz_pub.publish(MarkerArray(markers=markers))
 
         # Create graph
@@ -259,7 +265,7 @@ class NavigateWaypoint:
         return m
 
     def get_waypoints_callback(self, req: GetWaypointsRequest):
-        return GetWaypointsResponse(waypoints=[key for key in self.goals.keys()])
+        return GetWaypointsResponse(waypoints=self.nav_waypoints)
 
 
 if __name__ == '__main__':
