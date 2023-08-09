@@ -28,23 +28,22 @@ bool DWAPlusPlannerROS::setPlan(const std::vector<geometry_msgs::PoseStamped>& o
 bool DWAPlusPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
     geometry_msgs::PoseStamped robot_pose;
     costmap_ros_->getRobotPose(robot_pose);
-    if (rotate_) {
+
+    if (rotate_ && fabs(tf2::getYaw(robot_pose.pose.orientation) - calculateYaw(robot_pose)) > 0.1) {
+        // ROS_INFO_STREAM("Rotate");
         double yaw = calculateYaw(robot_pose);
         double robot_yaw = tf2::getYaw(robot_pose.pose.orientation);
-        ROS_INFO_STREAM("Yaw: " << fabs(yaw - robot_yaw));
-        if (fabs(yaw - robot_yaw) < 0.1) {
-            rotate_ = false;
-        } else {
-            cmd_vel.linear.x = 0;
-            cmd_vel.linear.y = 0;
-            cmd_vel.linear.z = 0;
-            cmd_vel.angular.x = 0;
-            cmd_vel.angular.y = 0;
-            cmd_vel.angular.z = 0.1;
-            return true;
-        }
+        // ROS_INFO_STREAM("Robot Yaw: " << robot_yaw);
+        // ROS_INFO_STREAM("Goal Yaw: " << yaw);
+        cmd_vel.linear.x = 0;
+        cmd_vel.linear.y = 0;
+        cmd_vel.linear.z = 0;
+        cmd_vel.angular.x = 0;
+        cmd_vel.angular.y = 0;
+        cmd_vel.angular.z = 0.175;
+        return true;
     }
-
+    rotate_ = false;
     DWAPlannerROS::computeVelocityCommands(cmd_vel);
     return true;
 }
@@ -67,7 +66,7 @@ double DWAPlusPlannerROS::calculateYaw(geometry_msgs::PoseStamped robotPose) {
     }
     geometry_msgs::PoseStamped goalPose = plan_[index];
     size_t count = 1;
-    for (size_t i = index + 1; i < plan_.size() && i < index + 5; i++) {
+    for (size_t i = index + 1; i < plan_.size() && i < index + 20; i++) {
         goalPose.pose.position.x += plan_[i].pose.position.x;
         goalPose.pose.position.y += plan_[i].pose.position.y;
         count++;

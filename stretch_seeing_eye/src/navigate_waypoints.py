@@ -41,8 +41,8 @@ class NavigateWaypoint:
         # Publishers and Subscribers
         self.move_base_goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
         self.move_base_cancel_pub = rospy.Publisher('/move_base/cancel', GoalID, queue_size=1)
-        self.waypoint_rviz_pub = rospy.Publisher('/visualization_marker_array', MarkerArray, queue_size=10)
-        self.waypoint_pub = rospy.Publisher('/move_base/WaypointGlobalPlanner/waypoint', WaypointDijkstra, queue_size=1)  # Publish adjacency matrix
+        self.waypoint_rviz_pub = rospy.Publisher('/visualization_marker_array', MarkerArray, queue_size=10, latch=True)
+        self.waypoint_pub = rospy.Publisher('/move_base/WaypointGlobalPlanner/waypoint', WaypointDijkstra, queue_size=1, latch=True)  # Publish adjacency matrix
         self.message_pub = rospy.Publisher('/stretch_seeing_eye/message', String, queue_size=10)
         self.door_msg_pub = rospy.Publisher('/stretch_seeing_eye/door', DoorMsg, queue_size=10)
 
@@ -54,7 +54,7 @@ class NavigateWaypoint:
         self.get_waypoints_service = rospy.Service('/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
         self.stop_navigation_service = rospy.Service('/stretch_seeing_eye/stop_navigation', Trigger, self.stop_navigation_callback)
         self.check_door_service = rospy.ServiceProxy('/stretch_seeing_eye/detect_door_open', CheckClear)
-        self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
+        self.client = client.Client('/move_base/DWAPlusPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
 
         try:
