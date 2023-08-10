@@ -48,8 +48,8 @@ class DoorDetector {
             // check x1 and y1
             geometry_msgs::PoseStamped pose;
             pose.header.frame_id = "map";
-            pose.pose.position.x = x1 * costmap->info.resolution + costmap->info.origin.x;
-            pose.pose.position.y = y1 * costmap->info.resolution + costmap->info.origin.y;
+            pose.pose.position.x = x1 * costmap->info.resolution + costmap->info.origin.position.x;
+            pose.pose.position.y = y1 * costmap->info.resolution + costmap->info.origin.position.y;
             pose.pose.position.z = 0;
             p.poses.push_back(pose);
             if (costmap->data[x1 + y1 * costmap->info.width] >= 90) {
