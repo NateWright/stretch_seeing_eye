@@ -22,7 +22,7 @@ class DoorDetector {
         service = nh->advertiseService("/stretch_seeing_eye/detect_door_open", &DoorDetector::door_detection_srv, this);
 
         costmapSub = nh->subscribe("/move_base/local_costmap/costmap", 1, &DoorDetector::costmap_callback, this);
-        debugPath = nh->advertise<nav_msgs::Path>("/stretch_seeing_eye/debug_path");
+        debugPath = nh->advertise<nav_msgs::Path>("/stretch_seeing_eye/debug_path", 10);
 
         visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("base_link", "/rviz_visual_markers"));
     }
@@ -55,6 +55,7 @@ class DoorDetector {
             if (costmap->data[x1 + y1 * costmap->info.width] >= 90) {
                 res.success = false;
                 res.message = "Obstacle in the way\nVal: " + std::to_string(costmap->data[x1 + y1 * costmap->info.width]);
+                debugPath.publish(p);
                 return true;
             }
             if (x1 == x2 && y1 == y2) break;
