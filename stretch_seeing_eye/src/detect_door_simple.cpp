@@ -42,7 +42,7 @@ class DoorDetector {
 
         while (true) {
             // check x1 and y1
-            if (costmap->data[x1 + y1 * costmap->info.width] >= 253) {
+            if (costmap->data[x1 + y1 * costmap->info.width] >= 90) {
                 res.success = false;
                 res.message = "Obstacle in the way\nVal: " + std::to_string(costmap->data[x1 + y1 * costmap->info.width]);
                 return true;
