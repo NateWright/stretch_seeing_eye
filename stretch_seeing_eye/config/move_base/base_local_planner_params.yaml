@@ -41,9 +41,9 @@
 base_local_planner: "local_planner/DWAPlusPlannerROS"
 DWAPlusPlannerROS:
   # Robot configuration parameters
-  acc_lim_x: 1.0
+  acc_lim_x: 0.3
   acc_lim_y: 0.0
-  acc_lim_th: 1.0
+  acc_lim_theta: 0.3
   max_vel_x: 0.3
   min_vel_x: 0.0
   max_vel_y: 0.0
