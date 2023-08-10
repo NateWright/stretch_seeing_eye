@@ -5,6 +5,7 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
+#include <costmap
 
 #include <algorithm>
 #include <iterator>
@@ -42,7 +43,7 @@ class DoorDetector {
 
         while (true) {
             // check x1 and y1
-            if (costmap->data[x1 + y1 * costmap->info.width] != 0) {
+            if (costmap->data[x1 + y1 * costmap->info.width] >= 253) {
                 res.success = false;
                 res.message = "Obstacle in the way\nVal: " + std::to_string(costmap->data[x1 + y1 * costmap->info.width]);
                 return true;
