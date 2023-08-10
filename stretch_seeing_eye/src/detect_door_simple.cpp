@@ -1,4 +1,6 @@
+#include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/OccupancyGrid.h>
+#include <nav_msgs/Path.h>
 #include <ros/ros.h>
 #include <rviz_visual_tools/rviz_visual_tools.h>
 #include <std_srvs/Trigger.h>
@@ -20,6 +22,7 @@ class DoorDetector {
         service = nh->advertiseService("/stretch_seeing_eye/detect_door_open", &DoorDetector::door_detection_srv, this);
 
         costmapSub = nh->subscribe("/move_base/local_costmap/costmap", 1, &DoorDetector::costmap_callback, this);
+        debugPath = nh->advertise<nav_msgs::Path>("/stretch_seeing_eye/debug_path");
 
         visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("base_link", "/rviz_visual_markers"));
     }
@@ -39,9 +42,16 @@ class DoorDetector {
         int dy = -abs(y2 - y1);
         int sy = y1 < y2 ? 1 : -1;
         int err = dx + dy;
-
+        nav_msgs::Path p;
+        p.header.frame_id = "map";
         while (true) {
             // check x1 and y1
+            geometry_msgs::PoseStamped pose;
+            pose.header.frame_id = "map";
+            pose.pose.position.x = x1 * costmap->info.resolution + costmap->info.origin.x;
+            pose.pose.position.y = y1 * costmap->info.resolution + costmap->info.origin.y;
+            pose.pose.position.z = 0;
+            p.poses.push_back(pose);
             if (costmap->data[x1 + y1 * costmap->info.width] >= 90) {
                 res.success = false;
                 res.message = "Obstacle in the way\nVal: " + std::to_string(costmap->data[x1 + y1 * costmap->info.width]);
@@ -73,6 +83,7 @@ class DoorDetector {
 
     ros::ServiceServer service;
 
+    ros::Publisher debugPath;
     ros::Subscriber costmapSub;
     nav_msgs::OccupancyGrid::Ptr costmap;
 
