@@ -44,7 +44,7 @@ class DoorDetector {
             // check x1 and y1
             if (costmap->data[x1 + y1 * costmap->info.width] != 0) {
                 res.success = false;
-                res.message = "Obstacle in the way";
+                res.message = "Obstacle in the way\nVal: " + std::to_string(costmap->data[x1 + y1 * costmap->info.width]);
                 return true;
             }
             if (x1 == x2 && y1 == y2) break;
