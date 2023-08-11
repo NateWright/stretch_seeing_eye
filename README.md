@@ -11,6 +11,14 @@ roslaunch rosbridge_server rosbridge_websocket.launch
 ```
 
 ```bash
+roslaunch stretch_core stretch_remote_bringup.launch
+roslaunch stretch_seeing_eye navigation.launch location:=dan rviz:=false
+roslaunch stretch_seeing_eye navigate_waypoints.launch location:=dan
+rviz -d `rospack find stretch_seeing_eye`/rviz/navigation.rviz
+roslaunch rosbridge_server rosbridge_websocket.launch
+```
+
+```bash
 roslaunch stretch_seeing_eye navigation.launch location:=gps_room rviz:=false
 rviz -d `rospack find stretch_seeing_eye`/rviz/navigation.rviz
 ```
