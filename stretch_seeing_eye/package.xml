@@ -39,6 +39,8 @@
     <depend>move_base_flex</depend>
     <depend>tf2_sensor_msgs</depend>
     <depend>nav_core</depend>
+    <depend>global_planner</depend>
+    <depend>dwa_local_planner</depend>
   <!--   Note that this is equivalent to the following: -->
   <!--   <build_depend>roscpp</build_depend> -->
   <!--   <exec_depend>roscpp</exec_depend> -->
