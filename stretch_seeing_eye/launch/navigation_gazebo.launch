@@ -1,6 +1,8 @@
 <launch>
 
-  <arg name="map_yaml"                                                   doc="filepath to previously captured map (required)" />
+  <arg name="location"/>
+  <!-- <arg name="map_yaml"                                                   doc="filepath to previously captured map (required)" /> -->
+  <arg name="map_yaml"               value="$(find stretch_seeing_eye)/maps/$(arg location)/map.yaml"/>
   <arg name="rviz"                   default="true"                      doc="whether to show Rviz" />
   <arg name="gazebo_world"           default="worlds/willowgarage.world" doc="the environment within which Stretch is loaded in Gazebo" />
   <arg name="gazebo_gpu_lidar"       default="false"                     doc="whether to compute lidar with hardware acceleration (requires GPU)" />
@@ -22,8 +24,8 @@
   <!-- NAVIGATION -->
   <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
     <param name="base_global_planner" value="waypoint_global_planner/WaypointGlobalPlanner"/>
-    <rosparam file="$(find stretch_navigation)/config/common_costmap_params.yaml" command="load" ns="global_costmap" />
-    <rosparam file="$(find stretch_navigation)/config/common_costmap_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find stretch_seeing_eye)/config/move_base/common_costmap_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find stretch_seeing_eye)/config/move_base/common_costmap_params.yaml" command="load" ns="local_costmap" />
     <rosparam file="$(find stretch_seeing_eye)/config/move_base/local_costmap_params.yaml" command="load" />
     <rosparam file="$(find stretch_seeing_eye)/config/move_base/global_costmap_params.yaml" command="load" />
     <rosparam file="$(find stretch_seeing_eye)/config/move_base/base_local_planner_params.yaml" command="load" />
