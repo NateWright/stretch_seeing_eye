@@ -22,17 +22,17 @@ void DWAPlusPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costma
 bool DWAPlusPlannerROS::setPlan(const std::vector<geometry_msgs::PoseStamped>& orig_global_plan) {
     rotate_ = true;
     plan_ = orig_global_plan;
-    ROS_INFO_STREAM("New Plan");
+    ROS_INFO_STREAM("New Plan: enabling rotate");
     return DWAPlannerROS::setPlan(orig_global_plan);
 }
 bool DWAPlusPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
     geometry_msgs::PoseStamped robot_pose;
     costmap_ros_->getRobotPose(robot_pose);
 
-    if (rotate_ && fabs(tf2::getYaw(robot_pose.pose.orientation) - calculateYaw(robot_pose)) > 0.1) {
-        // ROS_INFO_STREAM("Rotate");
-        double yaw = calculateYaw(robot_pose);
-        double robot_yaw = tf2::getYaw(robot_pose.pose.orientation);
+    double robotYaw = tf2::getYaw(robot_pose.pose.orientation);
+    double goalYaw = calculateYaw(robot_pose);
+    if (rotate_ && fabs(robotYaw - goalYaw) > 0.1) {
+        ROS_DEBUG_STREAM("Rotate");
         // ROS_INFO_STREAM("Robot Yaw: " << robot_yaw);
         // ROS_INFO_STREAM("Goal Yaw: " << yaw);
         cmd_vel.linear.x = 0;
@@ -40,7 +40,11 @@ bool DWAPlusPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
         cmd_vel.linear.z = 0;
         cmd_vel.angular.x = 0;
         cmd_vel.angular.y = 0;
-        cmd_vel.angular.z = 0.175;
+        if (robotYaw > goalYaw) {
+            cmd_vel.angular.z = -0.175;
+        } else {
+            cmd_vel.angular.z = 0.175;
+        }
         return true;
     }
     rotate_ = false;
