@@ -1,4 +1,5 @@
 #include <geometry_msgs/PoseStamped.h>
+#include <map_msgs/OccupancyGridUpdate.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
 #include <ros/ros.h>
@@ -22,6 +23,7 @@ class DoorDetector {
         service = nh->advertiseService("/stretch_seeing_eye/detect_door_open", &DoorDetector::door_detection_srv, this);
 
         costmapSub = nh->subscribe("/move_base/local_costmap/costmap", 1, &DoorDetector::costmap_callback, this);
+        costmapUpdateSub = nh->subscribe("/move_base/local_costmap/costmap_updates", 1, &DoorDetector::costmap_update_callback, this);
         debugPath = nh->advertise<nav_msgs::Path>("/stretch_seeing_eye/debug_path", 10);
 
         visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("base_link", "/rviz_visual_markers"));
@@ -77,6 +79,19 @@ class DoorDetector {
     }
     void costmap_callback(const nav_msgs::OccupancyGrid::Ptr msg) {
         costmap = msg;
+        // ROS_INFO_STREAM("Costmap received");
+        // ROS_INFO_STREAM("Costmap width: " << costmap->info.width);
+        // ROS_INFO_STREAM("Costmap height: " << costmap->info.height);
+    }
+    void costmap_update_callback(const map_msgs::OccupancyGridUpdate::Ptr msg) {
+        if (!costmap) return;
+        // ROS_INFO_STREAM("Costmap update received");
+        // ROS_INFO_STREAM("Costmap update width: " << msg->width);
+        // ROS_INFO_STREAM("Costmap update height: " << msg->height);
+        // for (size_t i = 0; i < msg->data.size(); i++) {
+        // costmap->data[msg->x + msg->y * costmap->info.width] = msg->data[i];
+        // }
+        costmap->data = msg->data;
     }
 
    private:
@@ -86,6 +101,7 @@ class DoorDetector {
 
     ros::Publisher debugPath;
     ros::Subscriber costmapSub;
+    ros::Subscriber costmapUpdateSub;
     nav_msgs::OccupancyGrid::Ptr costmap;
 
     tf2_ros::Buffer tfBuffer;
