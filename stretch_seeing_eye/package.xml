@@ -41,6 +41,7 @@
     <depend>nav_core</depend>
     <depend>global_planner</depend>
     <depend>dwa_local_planner</depend>
+    <depend>rosbridge_server</depend>
   <!--   Note that this is equivalent to the following: -->
   <!--   <build_depend>roscpp</build_depend> -->
   <!--   <exec_depend>roscpp</exec_depend> -->
