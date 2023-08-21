@@ -25,6 +25,7 @@ class DoorDetector {
         costmapSub = nh->subscribe("/move_base/local_costmap/costmap", 1, &DoorDetector::costmap_callback, this);
         costmapUpdateSub = nh->subscribe("/move_base/local_costmap/costmap_updates", 1, &DoorDetector::costmap_update_callback, this);
         debugPath = nh->advertise<nav_msgs::Path>("/stretch_seeing_eye/debug_path", 10);
+        debugCostmap = nh->advertise<nav_msgs::OccupancyGrid>("/stretch_seeing_eye/debug_costmap", 10);
 
         visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("base_link", "/rviz_visual_markers"));
     }
@@ -46,6 +47,7 @@ class DoorDetector {
         int err = dx + dy;
         nav_msgs::Path p;
         p.header.frame_id = "map";
+        debugCostmap.publish(*costmap);
         while (true) {
             // check x1 and y1
             geometry_msgs::PoseStamped pose;
@@ -73,6 +75,7 @@ class DoorDetector {
                 y1 += sy;
             }
         }
+        debugPath.publish(p);
         res.success = true;
         res.message = "No obstacle in the way";
         return true;
@@ -85,13 +88,16 @@ class DoorDetector {
     }
     void costmap_update_callback(const map_msgs::OccupancyGridUpdate::Ptr msg) {
         if (!costmap) return;
-        // ROS_INFO_STREAM("Costmap update received");
+        ROS_INFO_STREAM("Costmap update received");
         // ROS_INFO_STREAM("Costmap update width: " << msg->width);
         // ROS_INFO_STREAM("Costmap update height: " << msg->height);
-        // for (size_t i = 0; i < msg->data.size(); i++) {
-        // costmap->data[msg->x + msg->y * costmap->info.width] = msg->data[i];
-        // }
-        costmap->data = msg->data;
+
+        for (auto x = msg->x; x < msg->x + msg->width; x++) {
+            for (auto y = msg->y; y < msg->y + msg->height; y++) {
+                costmap->data[x + y * costmap->info.width] = msg->data[(x - msg->x) + (y - msg->y) * msg->width];
+            }
+        }
+        // costmap->data = msg->data;
     }
 
    private:
@@ -100,6 +106,7 @@ class DoorDetector {
     ros::ServiceServer service;
 
     ros::Publisher debugPath;
+    ros::Publisher debugCostmap;
     ros::Subscriber costmapSub;
     ros::Subscriber costmapUpdateSub;
     nav_msgs::OccupancyGrid::Ptr costmap;
