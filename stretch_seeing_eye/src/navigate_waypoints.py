@@ -33,9 +33,9 @@ class NavigateWaypoint:
         self.max_vel = 0.3
         self.scaling_factor = 1.0
 
-        self.waypoints = {}
-        self.doors = {}
-        self.goals = {}
+        self.waypoints = {} # id -> Waypoint
+        self.doors = {} # id -> Door
+        self.goals = {} # name -> Waypoint/Door
         self.nav_waypoints: list[str] = []
 
         # Publishers and Subscribers
@@ -136,22 +136,22 @@ class NavigateWaypoint:
                         d.entrance_pose.pose.orientation = Quaternion(q[0], q[1], q[2], q[3])
                         q = quaternion_from_euler(0, 0, math.atan2(d.entrance_pose.pose.position.y - d.inside_pose.pose.position.y, d.entrance_pose.pose.position.x - d.inside_pose.pose.position.x))
                         d.inside_pose.pose.orientation = Quaternion(q[0], q[1], q[2], q[3])
-                        self.goals[d.name + ' Inside'] = d.inside_pose
-                        self.goals[d.name + ' Entrance'] = d.entrance_pose
+                        self.goals[d.name + ' Inside'] = d
+                        self.goals[d.name + ' Entrance'] = d
                         self.nav_waypoints.append(d.name + ' Inside')
                         self.nav_waypoints.append(d.name + ' Entrance')
                         count += 1
                         markers.append(self.create_marker(
                             d.inside_pose, -d.id, ColorRGBA(1.0, 0.0, 0.0, 1.0)))
                     else:
-                        self.goals[d.name] = d.entrance_pose
+                        self.goals[d.name + ' Entrance'] = d
                         self.nav_waypoints.append(d.name)
                 elif line.startswith('Waypoint'):
                     w = Waypoint(line)
                     self.waypoints[w.id] = w
                     count += 1
                     markers.append(self.create_marker(w.poseStamped, w.id))
-                    self.goals[w.name] = w.poseStamped
+                    self.goals[w.name] = w
                     if w.navigatable:
                         self.nav_waypoints.append(w.name)
         self.waypoint_rviz_pub.publish(MarkerArray(markers=markers))
@@ -197,6 +197,56 @@ class NavigateWaypoint:
             'adjacency_matrix': [[i for i, v in enumerate(row) if v > 0] for row in adjacency_matrix],
         }
         self.waypoint_pub.publish(msg)
+    
+    def wait_for_move_base(self):
+        while not rospy.is_shutdown() and self.moving:
+            self.check_points()
+            rospy.sleep(0.1)
+
+    def entrance_routine(self, goal: str):
+        self.update_move_base('yaw_goal_tolerance', 0.05)
+
+        self.message_pub.publish(String(data='Navigating to ' + goal))
+
+        self.move_base_goal_pub.publish(self.goals[goal].entrance_pose)
+        rospy.sleep(2)
+        self.wait_for_move_base()
+        return
+    
+    def inside_routine(self, goal: str):
+        self.update_move_base('yaw_goal_tolerance', 0.05)
+
+        door: Door = self.goals[goal]
+
+        self.message_pub.publish(String(data='Navigating to ' + goal.replace('Inside', 'Entrance') + ' and then through the door if open'))
+        self.move_base_goal_pub.publish(door.entrance_pose)
+        rospy.sleep(2)
+        self.wait_for_move_base()
+
+        rospy.logdebug('Checking for door')
+        req = CheckClearRequest()
+        req.p1 = door.entrance_pose
+        req.p2 = door.inside_pose
+        res = self.check_door_service(req)
+        if res.success:
+            rospy.logdebug('Door open')
+            self.message_pub.publish(String(data='Proceeding through door'))
+            self.move_base_goal_pub.publish(door.inside_pose)
+            rospy.sleep(2)
+            self.wait_for_move_base()
+        else:
+            rospy.logdebug('Door closed')
+            rospy.logdebug(res.message)
+            self.message_pub.publish(String(data='Door closed'))
+
+    def waypoint_routine(self, goal: str):
+        self.update_move_base('yaw_goal_tolerance', 6.28)
+        waypoint = self.goals[goal]
+        self.message_pub.publish(String(data='Navigating to ' + goal))
+        self.move_base_goal_pub.publish(waypoint.poseStamped)
+        rospy.sleep(2)
+        self.wait_for_move_base()
+        return
 
     def navigate_to_waypoint(self, msg: WaypointRequest):
         if msg.data is None or msg.data == '':
@@ -207,45 +257,12 @@ class NavigateWaypoint:
             rospy.logdebug('Goal unknown')
             return WaypointResponse()
 
-        inside = False
         if 'Entrance' in goal:
-            self.update_move_base('yaw_goal_tolerance', 0.05)
-            goal_pose = self.goals[goal]
-            self.message_pub.publish(String(data='Navigating to ' + goal))
+            self.entrance_routine(goal)
         elif 'Inside' in goal:
-            self.update_move_base('yaw_goal_tolerance', 0.05)
-            inside = True
-            goal_pose = self.goals[goal.replace('Inside', 'Entrance')]
-            self.message_pub.publish(String(data='Navigating to ' + goal.replace('Inside', 'Entrance') + ' and then through the door if open'))
+            self.inside_routine(goal)
         else:
-            self.update_move_base('yaw_goal_tolerance', 6.28)
-            goal_pose = self.goals[goal]
-            self.message_pub.publish(String(data='Navigating to ' + goal))
-
-        self.move_base_goal_pub.publish(goal_pose)
-        rospy.sleep(2)
-        while self.moving:
-            self.check_points()
-            rospy.sleep(0.1)
-
-        if inside:
-            # Check for door
-            rospy.logdebug('Checking for door')
-            req = CheckClearRequest()
-            req.p1 = self.goals[goal.replace('Inside', 'Entrance')]
-            req.p2 = self.goals[goal]
-            res = self.check_door_service(req)
-            if res.success:
-                rospy.logdebug('Door open')
-                self.message_pub.publish(String(data='Proceeding through door'))
-                self.move_base_goal_pub.publish(self.goals[goal])
-                rospy.sleep(2)
-                while self.moving:
-                    rospy.sleep(0.1)
-            else:
-                rospy.logdebug('Door closed')
-                rospy.logdebug(res.message)
-                self.message_pub.publish(String(data='Door closed'))
+            self.waypoint_routine(goal)
 
         return WaypointResponse()
 
