@@ -29,7 +29,7 @@
           type: laser_filters/LaserScanAngularBoundsFilter
           params:
             lower_angle: 3.14
-            upper_angle: 9.42
+            upper_angle: -3.14
     </rosparam>
   </node>
   <!-- -->
