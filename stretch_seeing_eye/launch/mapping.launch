@@ -1,0 +1,22 @@
+<launch>
+
+  <arg name="rviz"        default="true"     doc="whether to show Rviz" />
+  <arg name="teleop_type" default="keyboard" doc="how to teleop ('keyboard', 'joystick', or 'none')" />
+
+  <!-- TELEOP -->
+  <include file="$(find stretch_core)/launch/teleop_twist.launch">
+    <arg name="teleop_type" value="$(arg teleop_type)" />
+    <arg name="linear" value="0.04" />
+    <arg name="angular" value="0.1" />
+    <arg name="twist_topic" value="/stretch/cmd_vel" />
+  </include>
+
+  <!-- MAPPING -->
+  <node pkg="gmapping" type="slam_gmapping" name="gmapping_record_map" output="log" >
+	<remap from="/scan" to="/scan_filtered"/>
+  </node>
+
+  <!-- VISUALIZE -->
+  <node name="rviz" pkg="rviz" type="rviz" output="log" args="-d $(find stretch_navigation)/rviz/mapping.rviz" if="$(arg rviz)" />
+
+</launch>
