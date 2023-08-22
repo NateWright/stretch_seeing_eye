@@ -13,7 +13,7 @@ roslaunch rosbridge_server rosbridge_websocket.launch
 ```bash
 # On Robot
 roslaunch stretch_seeing_eye stretch_remote_bringup.launch
-roslaunch stretch_seeing_eye mapping.launch
+roslaunch stretch_seeing_eye mapping.launch rviz:=false teleop_type:=none
 # On terminal
 rviz -d `rospack find stretch_navigation`/rviz/mapping.rviz
 roslaunch stretch_core teleop_twist.launch teleop_type:=keyboard
