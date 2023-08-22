@@ -20,7 +20,6 @@
   
   <!-- LASER RANGE FINDER -->
   <include file="$(find stretch_seeing_eye)/launch/rplidar_mod.launch" />
-  <include file="$(find stretch_seeing_eye)/launch/scan_filter.launch"/>
   <!-- -->
   
 </launch>
