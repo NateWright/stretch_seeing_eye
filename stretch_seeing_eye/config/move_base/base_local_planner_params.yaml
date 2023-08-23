@@ -38,8 +38,10 @@
 #   heading_scoring_timestep: 0.8
 #   heading_scoring: true
 # Base profile
-base_local_planner: "local_planner/DWAPlusPlannerROS"
-DWAPlusPlannerROS:
+# base_local_planner: "local_planner/DWAPlusPlannerROS"
+# DWAPlusPlannerROS:
+base_local_planner: "dwa_local_planner/DWAPlannerROS"
+DWAPlannerROS:
   # Robot configuration parameters
   acc_lim_x: 0.3
   acc_lim_y: 0.0
