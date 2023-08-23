@@ -25,8 +25,8 @@
   <!-- NAVIGATION -->
   <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
     <param name="base_global_planner" value="waypoint_global_planner/WaypointGlobalPlanner"/>
-    <rosparam file="$(find stretch_navigation)/config/common_costmap_params.yaml" command="load" ns="global_costmap" />
-    <rosparam file="$(find stretch_navigation)/config/common_costmap_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find stretch_seeing_eye)/config/move_base/common_costmap_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find stretch_seeing_eye)/config/move_base/common_costmap_params.yaml" command="load" ns="local_costmap" />
     <rosparam file="$(find stretch_seeing_eye)/config/move_base/local_costmap_params.yaml" command="load" />
     <rosparam file="$(find stretch_seeing_eye)/config/move_base/global_costmap_params.yaml" command="load" />
     <rosparam file="$(find stretch_seeing_eye)/config/move_base/base_local_planner_params.yaml" command="load" />
