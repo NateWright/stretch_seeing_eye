@@ -30,8 +30,8 @@ class Waypoint:
         self.doors: list[int] = []
         for _ in range(doorCount):
             self.doors.append(int(next(dataIter)))
-        self.navigatable = next(dataIter).strip().lower() == 'true'
-        if self.navigatable:
+        self.navigable = next(dataIter).strip().lower() == 'true'
+        if self.navigable:
             self.detail_level: DetailLevel = getattr(
                 DetailLevel, next(dataIter)).value
 
