@@ -88,7 +88,7 @@ class DoorDetector {
     }
     void costmap_update_callback(const map_msgs::OccupancyGridUpdate::Ptr msg) {
         if (!costmap) return;
-        ROS_INFO_STREAM("Costmap update received");
+        // ROS_INFO_STREAM("Costmap update received");
         // ROS_INFO_STREAM("Costmap update width: " << msg->width);
         // ROS_INFO_STREAM("Costmap update height: " << msg->height);
 
