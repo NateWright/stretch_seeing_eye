@@ -78,6 +78,7 @@ add_service_files(
   Waypoint.srv
   GetWaypoints.srv
   CheckClear.srv
+  MakePath.srv
 )
 
 ## Generate actions in the 'action' folder

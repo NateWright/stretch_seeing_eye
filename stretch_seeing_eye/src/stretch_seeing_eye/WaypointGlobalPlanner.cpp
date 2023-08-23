@@ -24,6 +24,9 @@ void WaypointGlobalPlanner::initialize(std::string name, costmap_2d::Costmap2D* 
     dijkstra = Dijkstra(Graph());
     pnh = ros::NodeHandle("~/" + name);
     waypoint_sub = pnh.subscribe("waypoint", 1, &WaypointGlobalPlanner::waypointCallback, this);
+    current_waypoint_sub = pnh.subscribe("current_waypoint", 1, &WaypointGlobalPlanner::currentWaypointCallback, this);
+    waypoint_path_srv = pnh.advertiseService("waypoint_path", &WaypointGlobalPlanner::makePath, this);
+    current_waypoint = -1;
 }
 
 bool WaypointGlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start,
@@ -32,14 +35,19 @@ bool WaypointGlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start,
     if (waypoints.empty()) {
         return false;
     }
-    size_t current_waypoint = closestWaypoint(start);
-    size_t goal_waypoint = closestWaypoint(goal);
+    size_t current_waypoint;
+    if (this->current_waypoint < 0) {
+        current_waypoint = closestWaypointPath(start);
+    } else {
+        current_waypoint = this->current_waypoint;
+    }
+    size_t goal_waypoint = closestWaypointDist(goal);
     if (current_waypoint == goal_waypoint) {
         plan.push_back(start);
         plan.push_back(goal);
         return true;
     }
-    vector<int> path = dijkstra.DijkstraAlgo(current_waypoint, goal_waypoint);
+    vector<size_t> path = dijkstra.DijkstraAlgo(current_waypoint, goal_waypoint);
     path.push_back(goal_waypoint);
     std::vector<geometry_msgs::PoseStamped> points;
     std::vector<geometry_msgs::PoseStamped> tempPath;
@@ -58,6 +66,29 @@ bool WaypointGlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start,
     plan_pub_.publish(plan_msg);
     return true;
 }
+bool WaypointGlobalPlanner::makePath(stretch_seeing_eye::MakePath::Request& req,
+                                     stretch_seeing_eye::MakePath::Response& res) {
+    if (waypoints.empty()) {
+        return false;
+    }
+    size_t current_waypoint;
+    if (this->current_waypoint < 0) {
+        current_waypoint = closestWaypointPath(req.start);
+    } else {
+        current_waypoint = this->current_waypoint;
+    }
+    size_t goal_waypoint = closestWaypointDist(req.goal);
+    if (current_waypoint == goal_waypoint) {
+        res.points.push_back(goal_waypoint);
+        return true;
+    }
+    vector<size_t> path = dijkstra.DijkstraAlgo(current_waypoint, goal_waypoint);
+    path.push_back(goal_waypoint);
+    for (size_t i : path) {
+        res.points.push_back(i);
+    }
+    return true;
+}
 
 void WaypointGlobalPlanner::waypointCallback(const stretch_seeing_eye::WaypointDijkstraPtr& msg) {
     waypoints = msg->waypoints;
@@ -71,7 +102,7 @@ void WaypointGlobalPlanner::waypointCallback(const stretch_seeing_eye::WaypointD
     }
     dijkstra = Dijkstra(graph);
 }
-size_t WaypointGlobalPlanner::closestWaypoint(const geometry_msgs::PoseStamped& pose) {
+size_t WaypointGlobalPlanner::closestWaypointPath(const geometry_msgs::PoseStamped& pose) {
     size_t closest_waypoint = 0;
     double min_dist = std::numeric_limits<double>::max();
     for (size_t i = 0; i < waypoints.size(); i++) {
@@ -87,7 +118,25 @@ size_t WaypointGlobalPlanner::closestWaypoint(const geometry_msgs::PoseStamped& 
     return closest_waypoint;
 }
 
-double pathDistance(const path& path) {
+size_t WaypointGlobalPlanner::closestWaypointDist(const geometry_msgs::PoseStamped& pose) {
+    size_t closest_waypoint = 0;
+    double min_dist = std::numeric_limits<double>::max();
+    for (const geometry_msgs::PoseStamped& waypoint : waypoints) {
+        double dist = std::hypot(pose.pose.position.x - waypoint.pose.position.x, pose.pose.position.y - waypoint.pose.position.y);
+        if (dist < min_dist) {
+            min_dist = dist;
+            closest_waypoint = &waypoint - &waypoints[0];
+        }
+    }
+    return closest_waypoint;
+}
+
+void WaypointGlobalPlanner::currentWaypointCallback(const std_msgs::UInt32& msg) {
+    current_waypoint = msg.data;
+}
+
+double
+pathDistance(const path& path) {
     double distance = 0;
     for (size_t i = 0; i < path.size() - 1; i++) {
         distance += std::hypot(path[i].pose.position.x - path[i + 1].pose.position.x, path[i].pose.position.y - path[i + 1].pose.position.y);

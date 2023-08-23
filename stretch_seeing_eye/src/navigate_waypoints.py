@@ -16,6 +16,7 @@ from stretch_seeing_eye.Door import Door
 from stretch_seeing_eye.srv import Waypoint as WaypointSrv, WaypointRequest, WaypointResponse
 from stretch_seeing_eye.srv import GetWaypoints, GetWaypointsRequest, GetWaypointsResponse
 from stretch_seeing_eye.srv import CheckClear, CheckClearRequest, CheckClearResponse
+from stretch_seeing_eye.srv import MakePath, MakePathRequest, MakePathResponse
 from stretch_seeing_eye.msg import WaypointDijkstra, Door as DoorMsg
 
 
@@ -30,6 +31,7 @@ class NavigateWaypoint:
 
         self.moving = False
         self.pause = False
+        self.cancel = False
         self.max_vel = 0.3
         self.scaling_factor = 1.0
 
@@ -43,6 +45,7 @@ class NavigateWaypoint:
         self.move_base_cancel_pub = rospy.Publisher('/move_base/cancel', GoalID, queue_size=1)
         self.waypoint_rviz_pub = rospy.Publisher('/visualization_marker_array', MarkerArray, queue_size=10, latch=True)
         self.waypoint_pub = rospy.Publisher('/move_base/WaypointGlobalPlanner/waypoint', WaypointDijkstra, queue_size=1, latch=True)  # Publish adjacency matrix
+        self.current_waypoint_pub = rospy.Publisher('/move_base/WaypointGlobalPlanner/current_waypoint', UInt32, queue_size=1, latch=True)  # Publish adjacency matrix
         self.message_pub = rospy.Publisher('/stretch_seeing_eye/message', String, queue_size=10)
         self.door_msg_pub = rospy.Publisher('/stretch_seeing_eye/door', DoorMsg, queue_size=10)
 
@@ -53,8 +56,10 @@ class NavigateWaypoint:
         self.navigate_to_waypoint_service = rospy.Service('/stretch_seeing_eye/navigate_to_waypoint', WaypointSrv, self.navigate_to_waypoint)
         self.get_waypoints_service = rospy.Service('/stretch_seeing_eye/get_waypoints', GetWaypoints, self.get_waypoints_callback)
         self.stop_navigation_service = rospy.Service('/stretch_seeing_eye/stop_navigation', Trigger, self.stop_navigation_callback)
+
         self.check_door_service = rospy.ServiceProxy('/stretch_seeing_eye/detect_door_open', CheckClear)
-        self.client = client.Client('/move_base/DWAPlusPlannerROS', timeout=30, config_callback=None)
+        self.get_path_service = rospy.ServiceProxy('/move_base/WaypointGlobalPlanner/waypoint_path', MakePath)
+        self.client = client.Client('/move_base/DWAPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
 
         try:
@@ -69,20 +74,17 @@ class NavigateWaypoint:
         except Exception as e:
             rospy.logerr(e)
             return
-        adjacency_matrix = self.adjacency_matrix['adjacency_matrix']
-        points = self.adjacency_matrix['points']
-        lookup_table = self.adjacency_matrix['lookup_table']  # id -> index
-        reverse_lookup_table = self.adjacency_matrix['reverse_lookup_table']  # index -> id
-        for i, p in enumerate(points):
-            d = math.hypot(p.pose.position.x - transform.transform.translation.x, p.pose.position.y - transform.transform.translation.y)
+        
+        for id, wp in self.waypoints.items():
+            d = math.hypot(wp.poseStamped.pose.position.x - transform.transform.translation.x, wp.poseStamped.pose.position.y - transform.transform.translation.y)
             if d < 1:
-                for index in adjacency_matrix[i]:
-                    if index in reverse_lookup_table.keys():
-                        id = reverse_lookup_table[index]
-                        if id in self.doors:
-                            message = 'Near ' + self.doors[id].name
-                            self.door_msg_pub.publish(DoorMsg(detail_level=self.doors[id].detail_level, data=message))
-                            rospy.logdebug(message)
+                for door in wp.doors:
+                    message = 'Near ' + self.doors[door].name
+                    self.door_msg_pub.publish(DoorMsg(detail_level=self.doors[door].detail_level, data=message))
+                for w in wp.connections:
+                    if self.waypoints[w].navigable:
+                        message = 'Near ' + self.waypoints[w].name
+                        self.door_msg_pub.publish(DoorMsg(detail_level=self.waypoints[w].detail_level, data=message))
 
     def move_base_status_callback(self, msg: GoalStatusArray):
         if len(msg.status_list) and msg.status_list[-1].status == 1:  # type: ignore
@@ -114,6 +116,8 @@ class NavigateWaypoint:
 
     def stop_navigation_callback(self, msg: TriggerRequest):
         self.move_base_cancel_pub.publish(GoalID())
+        self.current_waypoint_pub.publish(UInt32(data=-1))
+        self.cancel = True
         return TriggerResponse(success=True)
 
     def import_data(self, file: str):
@@ -152,7 +156,7 @@ class NavigateWaypoint:
                     count += 1
                     markers.append(self.create_marker(w.poseStamped, w.id))
                     self.goals[w.name] = w
-                    if w.navigatable:
+                    if w.navigable:
                         self.nav_waypoints.append(w.name)
         self.waypoint_rviz_pub.publish(MarkerArray(markers=markers))
 
@@ -198,30 +202,67 @@ class NavigateWaypoint:
         }
         self.waypoint_pub.publish(msg)
     
-    def wait_for_move_base(self):
+    def wait_for_move_base(self, index = -1):
+        self.cancel = False
         while not rospy.is_shutdown() and self.moving:
             self.check_points()
             rospy.sleep(0.1)
+        if not self.cancel:
+            self.current_waypoint_pub.publish(UInt32(data=index))
+    
+    def rotate_routine(self, goal: PoseStamped):
+        rospy.logdebug('Rotate routine begin')
+        while not rospy.is_shutdown():
+            try:
+                transform: tf2_ros.TransformStamped = self.tfBuffer.lookup_transform('base_link', 'map', rospy.Time())
+                break
+            except Exception as e:
+                rospy.logerr(e)
+        
+        start = PoseStamped()
+        start.header.frame_id = 'map'
+        start.pose.position = transform.transform.translation
+        start.pose.orientation = transform.transform.rotation
+
+        req = MakePathRequest()
+        req.start = start
+        req.goal = goal
+        res = self.get_path_service(req)
+        if len(res.points) < 2:
+            return
+        pose1 = self.adjacency_matrix['points'][res.points[0]]
+        pose2 = self.adjacency_matrix['points'][res.points[1]]
+        q = quaternion_from_euler(0, 0, math.atan2(pose2.pose.position.y - pose1.pose.position.y, pose2.pose.position.x - pose1.pose.position.x))
+        pose1.pose.orientation = Quaternion(q[0], q[1], q[2], q[3])
+
+        self.update_move_base('yaw_goal_tolerance', 0.05)
+        self.move_base_goal_pub.publish(pose1)
+        rospy.sleep(2)
+        self.wait_for_move_base(index=res.points[0])
+        rospy.logdebug('Rotate routine end')
+
 
     def entrance_routine(self, goal: str):
-        self.update_move_base('yaw_goal_tolerance', 0.05)
+        self.rotate_routine(self.goals[goal].entrance_pose)
 
         self.message_pub.publish(String(data='Navigating to ' + goal))
 
+        self.update_move_base('yaw_goal_tolerance', 0.05)
         self.move_base_goal_pub.publish(self.goals[goal].entrance_pose)
         rospy.sleep(2)
-        self.wait_for_move_base()
+        self.wait_for_move_base(index=self.adjacency_matrix['lookup_table'][self.goals[goal].id])
         return
     
     def inside_routine(self, goal: str):
-        self.update_move_base('yaw_goal_tolerance', 0.05)
-
         door: Door = self.goals[goal]
 
+        self.rotate_routine(door.inside_pose)
+
         self.message_pub.publish(String(data='Navigating to ' + goal.replace('Inside', 'Entrance') + ' and then through the door if open'))
+        self.update_move_base('yaw_goal_tolerance', 0.05)
         self.move_base_goal_pub.publish(door.entrance_pose)
         rospy.sleep(2)
-        self.wait_for_move_base()
+        self.wait_for_move_base(index=self.adjacency_matrix['lookup_table'][door.id])
 
         rospy.logdebug('Checking for door')
         req = CheckClearRequest()
@@ -233,19 +274,22 @@ class NavigateWaypoint:
             self.message_pub.publish(String(data='Proceeding through door'))
             self.move_base_goal_pub.publish(door.inside_pose)
             rospy.sleep(2)
-            self.wait_for_move_base()
+            self.wait_for_move_base(index=self.adjacency_matrix['lookup_table'][door.id] + 1)
         else:
             rospy.logdebug('Door closed')
             rospy.logdebug(res.message)
             self.message_pub.publish(String(data='Door closed'))
 
     def waypoint_routine(self, goal: str):
-        self.update_move_base('yaw_goal_tolerance', 6.28)
         waypoint = self.goals[goal]
+
+        self.rotate_routine(waypoint.poseStamped)
+
         self.message_pub.publish(String(data='Navigating to ' + goal))
+        self.update_move_base('yaw_goal_tolerance', 6.28)
         self.move_base_goal_pub.publish(waypoint.poseStamped)
         rospy.sleep(2)
-        self.wait_for_move_base()
+        self.wait_for_move_base(self.adjacency_matrix['lookup_table'][waypoint.id])
         return
 
     def navigate_to_waypoint(self, msg: WaypointRequest):

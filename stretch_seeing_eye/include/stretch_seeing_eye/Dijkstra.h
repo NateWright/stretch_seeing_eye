@@ -29,7 +29,7 @@ class Dijkstra {
     }
     Dijkstra(Graph graph);
     ~Dijkstra();
-    vector<int> DijkstraAlgo(size_t src, size_t to);
+    vector<size_t> DijkstraAlgo(size_t src, size_t to);
 };
 
 Dijkstra::Dijkstra(Graph graph) : graph(graph) {
@@ -38,12 +38,12 @@ Dijkstra::Dijkstra(Graph graph) : graph(graph) {
 Dijkstra::~Dijkstra() {
 }
 
-vector<int> Dijkstra::DijkstraAlgo(size_t src, size_t to)  // adjacency matrix
+vector<size_t> Dijkstra::DijkstraAlgo(size_t src, size_t to)  // adjacency matrix
 {
     const size_t size = graph.size();
     vector<int> distance(size);  // array to calculate the minimum distance for each node
     vector<bool> Tset(size);     // boolean array to mark visited and unvisited for each node
-    vector<vector<int>> path(size);
+    vector<vector<size_t>> path(size);
 
     for (size_t k = 0; k < size; k++) {
         distance[k] = INT_MAX;
