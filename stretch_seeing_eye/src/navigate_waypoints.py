@@ -80,11 +80,11 @@ class NavigateWaypoint:
             if d < 1:
                 for door in wp.doors:
                     message = 'Near ' + self.doors[door].name
-                    self.door_msg_pub.publish(DoorMsg(detail_level=self.doors[door].detail_level, data=message))
+                    self.door_msg_pub.publish(DoorMsg(detail_level=self.doors[door].detail_level, data=message, angle=math.atan2(self.doors[door].entrance_pose.pose.position.y - transform.transform.translation.y, self.doors[door].entrance_pose.pose.position.x - transform.transform.translation.x)))
                 for w in wp.connections:
                     if self.waypoints[w].navigable:
                         message = 'Near ' + self.waypoints[w].name
-                        self.door_msg_pub.publish(DoorMsg(detail_level=self.waypoints[w].detail_level, data=message))
+                        self.door_msg_pub.publish(DoorMsg(detail_level=self.waypoints[w].detail_level, data=message, angle=math.atan2(self.waypoints[w].poseStamped.pose.position.y - transform.transform.translation.y, self.waypoints[w].poseStamped.pose.position.x - transform.transform.translation.x)))
 
     def move_base_status_callback(self, msg: GoalStatusArray):
         if len(msg.status_list) and msg.status_list[-1].status == 1:  # type: ignore
