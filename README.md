@@ -22,11 +22,13 @@ rosrun map_server map_saver
 
 # Real Robot with Map
 ```bash
+# On Robot
 roslaunch stretch_seeing_eye stretch_remote_bringup.launch
 roslaunch stretch_seeing_eye navigation.launch location:=dan rviz:=false
 roslaunch stretch_seeing_eye navigate_waypoints.launch location:=dan
-rviz -d `rospack find stretch_seeing_eye`/rviz/navigation.rviz
 roslaunch rosbridge_server rosbridge_websocket.launch
+# On terminal
+rviz -d `rospack find stretch_seeing_eye`/rviz/navigation.rviz
 ```
 
 ```bash
