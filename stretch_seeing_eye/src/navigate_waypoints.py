@@ -35,9 +35,9 @@ class NavigateWaypoint:
         self.max_vel = 0.3
         self.scaling_factor = 1.0
 
-        self.waypoints = {} # id -> Waypoint
-        self.doors = {} # id -> Door
-        self.goals = {} # name -> Waypoint/Door
+        self.waypoints = {}  # id -> Waypoint
+        self.doors = {}  # id -> Door
+        self.goals = {}  # name -> Waypoint/Door
         self.nav_waypoints: list[str] = []
 
         # Publishers and Subscribers
@@ -74,7 +74,7 @@ class NavigateWaypoint:
         except Exception as e:
             rospy.logerr(e)
             return
-        
+
         for id, wp in self.waypoints.items():
             d = math.hypot(wp.poseStamped.pose.position.x - transform.transform.translation.x, wp.poseStamped.pose.position.y - transform.transform.translation.y)
             if d < 1:
@@ -138,7 +138,7 @@ class NavigateWaypoint:
                     if d.inside:
                         q = quaternion_from_euler(0, 0, math.atan2(d.inside_pose.pose.position.y - d.entrance_pose.pose.position.y, d.inside_pose.pose.position.x - d.entrance_pose.pose.position.x))
                         d.entrance_pose.pose.orientation = Quaternion(q[0], q[1], q[2], q[3])
-                        q = quaternion_from_euler(0, 0, math.atan2(d.entrance_pose.pose.position.y - d.inside_pose.pose.position.y, d.entrance_pose.pose.position.x - d.inside_pose.pose.position.x))
+                        # q = quaternion_from_euler(0, 0, math.atan2(d.entrance_pose.pose.position.y - d.inside_pose.pose.position.y, d.entrance_pose.pose.position.x - d.inside_pose.pose.position.x))
                         d.inside_pose.pose.orientation = Quaternion(q[0], q[1], q[2], q[3])
                         self.goals[d.name + ' Inside'] = d
                         self.goals[d.name + ' Entrance'] = d
@@ -201,15 +201,15 @@ class NavigateWaypoint:
             'adjacency_matrix': [[i for i, v in enumerate(row) if v > 0] for row in adjacency_matrix],
         }
         self.waypoint_pub.publish(msg)
-    
-    def wait_for_move_base(self, index = -1):
+
+    def wait_for_move_base(self, index=-1):
         self.cancel = False
         while not rospy.is_shutdown() and self.moving:
             self.check_points()
             rospy.sleep(0.1)
         if not self.cancel:
             self.current_waypoint_pub.publish(UInt32(data=index))
-    
+
     def rotate_routine(self, goal: PoseStamped):
         rospy.logdebug('Rotate routine begin')
         while not rospy.is_shutdown():
@@ -218,7 +218,7 @@ class NavigateWaypoint:
                 break
             except Exception as e:
                 rospy.logerr(e)
-        
+
         start = PoseStamped()
         start.header.frame_id = 'map'
         start.pose.position = transform.transform.translation
@@ -241,7 +241,6 @@ class NavigateWaypoint:
         self.wait_for_move_base(index=res.points[0])
         rospy.logdebug('Rotate routine end')
 
-
     def entrance_routine(self, goal: str):
         self.rotate_routine(self.goals[goal].entrance_pose)
 
@@ -252,7 +251,7 @@ class NavigateWaypoint:
         rospy.sleep(2)
         self.wait_for_move_base(index=self.adjacency_matrix['lookup_table'][self.goals[goal].id])
         return
-    
+
     def inside_routine(self, goal: str):
         door: Door = self.goals[goal]
 
