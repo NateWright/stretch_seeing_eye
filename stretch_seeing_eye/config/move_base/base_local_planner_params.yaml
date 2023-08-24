@@ -66,8 +66,8 @@
 #   # use_dwa: false
 base_local_planner: "teb_local_planner/TebLocalPlannerROS"
 TebLocalPlannerROS:
-  acc_lim_x: 0.3
-  acc_lim_theta: 0.3
+  acc_lim_x: 0.1
+  acc_lim_theta: 0.1
   max_vel_x: 0.3
   max_vel_theta: 0.3
   xy_goal_tolerance: 0.2
