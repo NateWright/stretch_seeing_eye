@@ -64,8 +64,8 @@
 #   xy_goal_tolerance: 0.20 # (10cm) The tolerance in meters for the controller in the x & y distance when achieving a goal
 #   latch_xy_goal_tolerance: true # If goal tolerance is latched, if the robot ever reaches the goal xy location it will simply rotate in place, even if it ends up outside the goal tolerance while it is doing so.
 #   # use_dwa: false
-base_local_planner: "teb_local_planner/TEBLocalPlannerROS"
-TEBLocalPlannerROS:
+base_local_planner: "teb_local_planner/TebLocalPlannerROS"
+TebLocalPlannerROS:
   acc_lim_x: 0.3
   acc_lim_theta: 0.3
   max_vel_x: 0.3
