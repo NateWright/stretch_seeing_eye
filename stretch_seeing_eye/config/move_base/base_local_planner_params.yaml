@@ -43,17 +43,17 @@
 base_local_planner: "dwa_local_planner/DWAPlannerROS"
 DWAPlannerROS:
   # Robot configuration parameters
-  acc_lim_x: 0.3
+  acc_lim_x: 0.6
   acc_lim_y: 0.0
-  acc_lim_theta: 0.3
+  acc_lim_theta: 0.6
   max_vel_x: 0.3
   min_vel_x: 0.0
   max_vel_y: 0.0
   min_vel_y: 0.0
-  max_vel_theta: 0.3
+  max_vel_theta: 0.6
   min_vel_theta: 0.0
   min_in_place_vel_theta: 0.1
-  holonomic_robot: false
+  # holonomic_robot: false
 
   # path_distance_bias: 64.0
   # Simulation Parameters
@@ -63,4 +63,4 @@ DWAPlannerROS:
   yaw_goal_tolerance: 0.08 # (5 degrees) The tolerance in radians for the controller in yaw/rotation when achieving its goal
   xy_goal_tolerance: 0.20 # (10cm) The tolerance in meters for the controller in the x & y distance when achieving a goal
   latch_xy_goal_tolerance: true # If goal tolerance is latched, if the robot ever reaches the goal xy location it will simply rotate in place, even if it ends up outside the goal tolerance while it is doing so.
-  use_dwa: false
+  # use_dwa: false
