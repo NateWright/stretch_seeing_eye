@@ -271,6 +271,7 @@ class NavigateWaypoint:
         if res.success:
             rospy.logdebug('Door open')
             self.message_pub.publish(String(data='Proceeding through door'))
+            self.update_move_base('yaw_goal_tolerance', 6.28)
             self.move_base_goal_pub.publish(door.inside_pose)
             rospy.sleep(2)
             self.wait_for_move_base(index=self.adjacency_matrix['lookup_table'][door.id] + 1)
