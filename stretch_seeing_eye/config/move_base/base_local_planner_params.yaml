@@ -73,4 +73,7 @@ TebLocalPlannerROS:
   xy_goal_tolerance: 0.2
   yaw_goal_tolerance: 0.2
 
-  min_obstacle_dist: 0.1
+  min_obstacle_dist: 0.25
+  min_turning_radius: 0.0
+
+  weight_kinematics_forward_drive: 1000
