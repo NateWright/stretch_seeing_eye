@@ -5,6 +5,8 @@ import math as Math
 from geometry_msgs.msg import PointStamped, Point
 from stretch_moveit_shim.srv import SetJoints, SetJointsRequest
 from stretch_moveit_shim.msg import Joint
+from people_msgs.msg import PositionMeasurementArray, PositionMeasurement
+
 
 class FollowClass():
     def __init__(self) -> None:
@@ -17,14 +19,16 @@ class FollowClass():
         self.face_tracking_point_sub = rospy.Subscriber('/stretch_seeing_eye/face_tracking_point', PointStamped, self.callback, queue_size=1)
         self.move_joints = rospy.ServiceProxy('/stretch_interface/set_joints', SetJoints)
 
-    def callback(self, point: PointStamped):
+    def callback(self, arr: PositionMeasurementArray):
+        if len(arr.people) < 1:
+            return
+        angle = Math.atan2(arr.people[0].pos.y, arr.people[0].pos.x)
         # rospy.logdebug(point)
-        angle = Math.atan2(point.point.y, point.point.z) 
         if abs(angle) < 0.1:
             return
-        self.joint_angle += angle
+        # self.joint_angle += angle
         rospy.logdebug(angle)
-        req = SetJointsRequest([Joint(joint_name='joint_head_pan', val=self.joint_angle)])
+        req = SetJointsRequest([Joint(joint_name='joint_head_pan', val=angle)])
         self.move_joints(req)
 
 
