@@ -29,6 +29,9 @@ roslaunch stretch_seeing_eye navigate_waypoints.launch location:=dan
 roslaunch rosbridge_server rosbridge_websocket.launch
 # On terminal
 rviz -d `rospack find stretch_seeing_eye`/rviz/navigation.rviz
+
+# Face Detector test
+roslaunch face_detector face_detector.rgbd.launch rgb_ns:=color image_topic:=image_raw depth_ns:=aligned_depth_to_color fixed_frame:=camera_depth_optical_frame depth_topic:=image_raw
 ```
 
 ```bash

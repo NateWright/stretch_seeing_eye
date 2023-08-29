@@ -77,6 +77,7 @@ add_service_files(
   Feature.srv
   Waypoint.srv
   GetWaypoints.srv
+  FindFace.srv
   CheckClear.srv
   MakePath.srv
 )
