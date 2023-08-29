@@ -4,7 +4,7 @@ import tf2_geometry_msgs
 import math as Math
 from geometry_msgs.msg import PointStamped, Point
 from stretch_moveit_shim.srv import SetJoints, SetJointsRequest
-from stretch_moveit_shim.msg import Joint
+from stretch_moveit_shim.msg import Joint, Joints
 from people_msgs.msg import PositionMeasurementArray, PositionMeasurement
 
 
@@ -18,6 +18,7 @@ class FollowClass():
 
         self.face_tracking_point_sub = rospy.Subscriber('/face_detector/people_tracker_measurements_array', PositionMeasurementArray, self.callback, queue_size=1)
         self.move_joints = rospy.ServiceProxy('/stretch_interface/set_joints', SetJoints)
+        self.move_joints_pub = rospy.Publisher('/stretch_interface/set_joints', Joints, queue_size=10)
         self.debug_pub = rospy.Publisher('/stretch_seeing_eye/face_follow/debug_point', PointStamped, queue_size=10)
         self.point_stamped = PointStamped()
         self.point_stamped.header.frame_id = 'camera_color_optical_frame'
@@ -33,9 +34,12 @@ class FollowClass():
         if abs(angle) < 0.05:
             return
         # self.joint_angle += angle
-        rospy.logdebug(angle)
-        req = SetJointsRequest([Joint(joint_name='joint_head_pan', val=angle)])
-        self.move_joints(req)
+        j = Joints()
+        j.joints = [Joint(joint_name='joint_head_pan', val=angle)]
+        self.move_joints_pub.publish(j)
+        # rospy.logdebug(angle)
+        # req = SetJointsRequest([Joint(joint_name='joint_head_pan', val=angle)])
+        # self.move_joints(req)
 
 
 
