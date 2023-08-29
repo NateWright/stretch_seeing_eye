@@ -66,7 +66,7 @@ class TestClass():
                 else:
                     self.old_faces.pop(i)
         # publish image
-        msg = self.bridge.cv2_to_imgmsg(image, '8UC1')
+        msg = self.bridge.cv2_to_imgmsg(image, encoding="passthrough")
         msg.header = cloud.header
         self.face_tracking_pub.publish(msg)
 
