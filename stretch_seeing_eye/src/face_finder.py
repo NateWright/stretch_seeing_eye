@@ -9,7 +9,7 @@ from stretch_seeing_eye.srv import FindFace, FindFaceRequest, FindFaceResponse
 from people_msgs.msg import PositionMeasurementArray, PositionMeasurement
 
 
-class FindFace():
+class FaceFinder():
     def __init__(self) -> None:
         self.tf_buffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tf_buffer)
@@ -58,5 +58,5 @@ class FindFace():
 
 if __name__ == '__main__':
     rospy.init_node('find_face', anonymous=True, log_level=rospy.DEBUG)
-    follow = FindFace()
+    follow = FaceFinder()
     rospy.spin()
