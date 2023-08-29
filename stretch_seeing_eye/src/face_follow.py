@@ -23,8 +23,8 @@ class FollowClass():
         if len(arr.people) < 1:
             return
         angle = Math.atan2(arr.people[0].pos.y, arr.people[0].pos.x)
-        # rospy.logdebug(point)
-        if abs(angle) < 0.1:
+        rospy.logdebug(arr.people[0].pos)
+        if abs(angle) < 0.05:
             return
         # self.joint_angle += angle
         rospy.logdebug(angle)
