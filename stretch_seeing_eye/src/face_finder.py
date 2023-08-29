@@ -51,7 +51,7 @@ class FaceFinder():
         ps = PointStamped()
         ps.header.frame_id = arr.header.frame_id
         ps.point = arr.people[0].pos
-        self.point_stamped = self.tf_buffer.transform(self.point_stamped, 'base_link')
+        self.point_stamped = self.tf_buffer.transform(ps, 'base_link')
 
 
 
