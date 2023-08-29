@@ -10,8 +10,8 @@ from people_msgs.msg import PositionMeasurementArray, PositionMeasurement
 
 class FollowClass():
     def __init__(self) -> None:
-        # self.tf_buffer = tf2_ros.Buffer()
-        # self.listener = tf2_ros.TransformListener(self.tf_buffer)
+        self.tf_buffer = tf2_ros.Buffer()
+        self.listener = tf2_ros.TransformListener(self.tf_buffer)
 
         rospy.wait_for_service('/stretch_interface/set_joints')
         self.joint_angle = 0
@@ -20,15 +20,16 @@ class FollowClass():
         self.move_joints = rospy.ServiceProxy('/stretch_interface/set_joints', SetJoints)
         self.debug_pub = rospy.Publisher('/stretch_seeing_eye/face_follow/debug_point', PointStamped, queue_size=10)
         self.point_stamped = PointStamped()
-        self.point_stamped.header.frame_id = 'base_link'
+        self.point_stamped.header.frame_id = 'camera_color_optical_frame'
 
     def callback(self, arr: PositionMeasurementArray):
         # rospy.logdebug("got message")
         if len(arr.people) < 1:
             return
-        angle = Math.atan2(arr.people[0].pos.y, arr.people[0].pos.x)
         self.point_stamped.point = arr.people[0].pos
         self.debug_pub.publish(self.point_stamped)
+        p = self.tf_buffer.transform(self.point_stamped, 'base_link')
+        angle = Math.atan2(p.point.y, p.point.x)
         if abs(angle) < 0.05:
             return
         # self.joint_angle += angle
