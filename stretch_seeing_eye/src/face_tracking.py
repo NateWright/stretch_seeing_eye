@@ -68,6 +68,8 @@ class TestClass():
         # publish image
         msg = self.bridge.cv2_to_imgmsg(image, encoding="passthrough")
         msg.header = cloud.header
+        msg.height = image.shape[0]
+        msg.width = image.shape[1]
         self.face_tracking_pub.publish(msg)
 
 
