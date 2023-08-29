@@ -67,6 +67,7 @@ class TestClass():
                     self.old_faces.pop(i)
         # publish image
         msg = self.bridge.cv2_to_imgmsg(image, encoding="passthrough")
+        rospy.logdebug(image.shape)
         msg.header = cloud.header
         msg.height = 480
         msg.width = 640
