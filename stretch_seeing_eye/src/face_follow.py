@@ -10,8 +10,8 @@ from people_msgs.msg import PositionMeasurementArray, PositionMeasurement
 
 class FollowClass():
     def __init__(self) -> None:
-        self.tf_buffer = tf2_ros.Buffer()
-        self.listener = tf2_ros.TransformListener(self.tf_buffer)
+        # self.tf_buffer = tf2_ros.Buffer()
+        # self.listener = tf2_ros.TransformListener(self.tf_buffer)
 
         rospy.wait_for_service('/stretch_interface/set_joints')
         self.joint_angle = 0
@@ -20,6 +20,7 @@ class FollowClass():
         self.move_joints = rospy.ServiceProxy('/stretch_interface/set_joints', SetJoints)
 
     def callback(self, arr: PositionMeasurementArray):
+        rospy.logdebug("got message")
         if len(arr.people) < 1:
             return
         angle = Math.atan2(arr.people[0].pos.y, arr.people[0].pos.x)
