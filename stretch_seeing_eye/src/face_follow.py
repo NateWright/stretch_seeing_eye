@@ -31,7 +31,7 @@ class FollowClass():
         self.debug_pub.publish(self.point_stamped)
         p = self.tf_buffer.transform(self.point_stamped, 'base_link')
         angle = Math.atan2(p.point.y, p.point.x)
-        if abs(angle) < 0.05:
+        if abs(angle) < 0.1:
             return
         # self.joint_angle += angle
         j = Joints()
