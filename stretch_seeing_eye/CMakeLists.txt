@@ -221,6 +221,7 @@ catkin_install_python(PROGRAMS
   src/effort_sensing_test.py
   src/face_tracking.py
   src/face_follow.py
+  src/face_finder.py
   src/ocr.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
