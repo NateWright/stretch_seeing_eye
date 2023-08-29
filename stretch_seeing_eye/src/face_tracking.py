@@ -29,6 +29,7 @@ class TestClass():
         image = pointcloud_to_image(arr)
         # image = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)
         image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        rospy.logdebug(image.shape)
 
         faces = self.detector(image, 1)
         if len(self.old_faces) < len(faces):
@@ -67,7 +68,6 @@ class TestClass():
                     self.old_faces.pop(i)
         # publish image
         msg = self.bridge.cv2_to_imgmsg(image, encoding="passthrough")
-        rospy.logdebug(image.shape)
         msg.header = cloud.header
         msg.height = 480
         msg.width = 640
