@@ -18,9 +18,9 @@ class FollowClass():
 
         self.face_tracking_point_sub = rospy.Subscriber('/face_detector/people_tracker_measurements_array', PositionMeasurementArray, self.callback, queue_size=1)
         self.move_joints = rospy.ServiceProxy('/stretch_interface/set_joints', SetJoints)
-        self.debug_pub = rospy.Publisher('/stretch_seeing_eye/face_follow/debug_point', PointStamped)
+        self.debug_pub = rospy.Publisher('/stretch_seeing_eye/face_follow/debug_point', PointStamped, queue_size=10)
         self.point_stamped = PointStamped()
-        self.point_stamped.header = 'base_link'
+        self.point_stamped.header.frame_id = 'base_link'
 
     def callback(self, arr: PositionMeasurementArray):
         # rospy.logdebug("got message")
