@@ -16,11 +16,11 @@ class FollowClass():
         rospy.wait_for_service('/stretch_interface/set_joints')
         self.joint_angle = 0
 
-        self.face_tracking_point_sub = rospy.Subscriber('/stretch_seeing_eye/face_tracking_point', PointStamped, self.callback, queue_size=1)
+        self.face_tracking_point_sub = rospy.Subscriber('/face_detector/people_tracker_measurements_array', PositionMeasurementArray, self.callback, queue_size=1)
         self.move_joints = rospy.ServiceProxy('/stretch_interface/set_joints', SetJoints)
 
     def callback(self, arr: PositionMeasurementArray):
-        rospy.logdebug("got message")
+        # rospy.logdebug("got message")
         if len(arr.people) < 1:
             return
         angle = Math.atan2(arr.people[0].pos.y, arr.people[0].pos.x)
