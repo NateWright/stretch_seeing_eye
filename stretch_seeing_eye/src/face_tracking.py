@@ -27,7 +27,7 @@ class TestClass():
         arr = ros_numpy.point_cloud2.split_rgb_field(pc2_arr)
         pointcloud_to_image = lambda x: np.uint8((np.uint(x['r']) + np.uint(x['g']) + np.uint(x['b'])) / 3)
         image = pointcloud_to_image(arr)
-        image = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)
+        # image = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)
         image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
 
         faces = self.detector(image, 1)
