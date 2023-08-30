@@ -4,7 +4,7 @@ import tf2_ros
 
 from tf.transformations import quaternion_from_euler
 from std_msgs.msg import Float32
-from geometry_msgs.msg import PoseStamped, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, Point, Quaternion, PointStamped
 from actionlib_msgs.msg import GoalStatusArray, GoalID
 from dynamic_reconfigure import client
 from visualization_msgs.msg import Marker, MarkerArray
@@ -253,9 +253,14 @@ class NavigateWaypoint:
         if not res_face.found:
             return
         req_plan = GetPlanRequest()
-        req_plan.goal = self.tfBuffer.transform(res_face.point, 'map')
+        goal = PoseStamped()
+        goal.header.frame_id = res_face.point.header.frame_id
+        goal.pose.position.x = res_face.point.point.x
+        goal.pose.position.y = res_face.point.point.x
+        goal.pose.position.z = 0
+        req_plan.goal = self.tfBuffer.transform(goal, 'map')
+
         transform: tf2_ros.TransformStamped = self.tfBuffer.lookup_transform('base_link', 'map', rospy.Time())
-        
         start = PoseStamped()
         start.header.frame_id = 'map'
         start.pose.position = transform.transform.translation
