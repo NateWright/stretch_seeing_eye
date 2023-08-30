@@ -45,13 +45,15 @@ class FaceFinder():
 
 
     def callback(self, arr: PositionMeasurementArray):
-        if len(arr.people) < 1:
-            return
-        self.found = True
-        ps = PointStamped()
-        ps.header.frame_id = arr.header.frame_id
-        ps.point = arr.people[0].pos
-        self.point_stamped = self.tf_buffer.transform(ps, 'base_link')
+        for i, p in enumerate(arr.people):
+            if p.reliability < 0.8:
+                rospy.logdebug('reliability too low')
+                continue
+            self.found = True
+            ps = PointStamped()
+            ps.header.frame_id = arr.header.frame_id
+            ps.point = p.pos
+            self.point_stamped = self.tf_buffer.transform(ps, 'base_link')
 
 
 
