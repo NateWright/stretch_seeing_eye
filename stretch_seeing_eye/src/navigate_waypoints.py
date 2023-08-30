@@ -62,7 +62,7 @@ class NavigateWaypoint:
 
         self.check_door_service = rospy.ServiceProxy('/stretch_seeing_eye/detect_door_open', CheckClear)
         self.create_path_service = rospy.ServiceProxy('/stretch_seeing_eye/create_path', GetPlan)
-        self.find_face_service = rospy.ServiceProxy('/stretch_seeing_eye/find_face', )
+        self.find_face_service = rospy.ServiceProxy('/stretch_seeing_eye/find_face', FindFace)
         self.get_path_service = rospy.ServiceProxy('/move_base/WaypointGlobalPlanner/waypoint_path', MakePath)
         self.client = client.Client('/move_base/TebLocalPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
