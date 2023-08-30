@@ -254,12 +254,15 @@ class NavigateWaypoint:
         if not res_face.found:
             return
         req_plan = GetPlanRequest()
+
+        transform = self.tfBuffer.lookup_transform('map', res_face.point.header.frame_id, rospy.Time())
+        point = tf2_geometry_msgs.do_transform_point(res_face.point.point, transform)
         goal = PoseStamped()
-        goal.header.frame_id = res_face.point.header.frame_id
-        goal.pose.position.x = res_face.point.point.x
-        goal.pose.position.y = res_face.point.point.x
+        goal.header.frame_id = point.header.frame_id
+        goal.pose.position.x = point.point.x
+        goal.pose.position.y = point.point.y
         goal.pose.position.z = 0
-        req_plan.goal = self.tfBuffer.transform(goal, 'map')
+        req_plan.goal = goal
 
         transform: tf2_ros.TransformStamped = self.tfBuffer.lookup_transform('base_link', 'map', rospy.Time())
         start = PoseStamped()
