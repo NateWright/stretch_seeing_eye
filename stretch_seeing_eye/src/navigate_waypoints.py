@@ -250,7 +250,7 @@ class NavigateWaypoint:
     
     def dock_person_routine(self):
         res_face: FindFaceResponse = self.find_face_service(FindFaceRequest())
-        if not res_face.success:
+        if not res_face.found:
             return
         req_plan = GetPlanRequest()
         req_plan.goal = self.tfBuffer.transform(res_face.point, 'map')
