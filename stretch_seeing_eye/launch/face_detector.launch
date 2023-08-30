@@ -1,0 +1,9 @@
+<launch>
+    <include file="$(find face_detector)/launch/face_detector.rgbd.launch">
+        <arg name="rgb_ns"          value="color" />
+        <arg name="image_topic"     value="image_raw" />
+        <arg name="depth_ns"        value="aligned_depth_to_color" />
+        <arg name="fixed_frame"     value="camera_depth_optical_frame" />
+        <arg name="depth_topic"     value="image_raw" />
+    </include>
+</launch>
