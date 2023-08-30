@@ -31,8 +31,8 @@ class FaceFinder():
         while not rospy.is_shutdown() and not self.found:
             req = SetJointsRequest([Joint(joint_name='joint_head_pan', val=angle)])
             self.move_joints(req)
-            rospy.sleep(0.1)
-            angle += 0.1
+            rospy.sleep(0.5)
+            angle += 0.2
             if self.found or angle > 1.8:
                 break
 
