@@ -9,6 +9,7 @@
         <arg name="fixed_frame"     value="camera_depth_optical_frame" />
         <arg name="depth_topic"     value="image_raw" />
     </include>
+    <node pkg="stretch_seeing_eye" type="face_finder.py" name="face_finder" output="screen"/>
     <node pkg="stretch_seeing_eye" type="navigate_waypoints.py"  name="navigate_waypoints" output="screen">
         <!-- <param name="start_waypoint" type="string" value/> -->
     </node>
