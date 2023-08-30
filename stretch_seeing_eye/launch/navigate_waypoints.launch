@@ -2,6 +2,13 @@
     <arg name="location"/>
     <param name="description_file" type="string" value="$(find stretch_seeing_eye)/config/$(arg location)/description_data.csv" />
     <node pkg="stretch_seeing_eye" type="detect_door_node" name="detect_door_node" output="screen"/>
+    <include file="$(find face_detector)/launch/face_detector.rgbd.launch">
+        <arg name="rgb_ns"          value="color" />
+        <arg name="image_topic"     value="image_raw" />
+        <arg name="depth_ns"        value="aligned_depth_to_color" />
+        <arg name="fixed_frame"     value="camera_depth_optical_frame" />
+        <arg name="depth_topic"     value="image_raw" />
+    </include>
     <node pkg="stretch_seeing_eye" type="navigate_waypoints.py"  name="navigate_waypoints" output="screen">
         <!-- <param name="start_waypoint" type="string" value/> -->
     </node>

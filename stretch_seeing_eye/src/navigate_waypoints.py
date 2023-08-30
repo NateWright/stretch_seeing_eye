@@ -10,12 +10,14 @@ from dynamic_reconfigure import client
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA, Float32, String, UInt32
 from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
+from nav_msgs.srv import GetPlan, GetPlanRequest, GetPlanResponse
 
 from stretch_seeing_eye.Waypoint import Waypoint
 from stretch_seeing_eye.Door import Door
 from stretch_seeing_eye.srv import Waypoint as WaypointSrv, WaypointRequest, WaypointResponse
 from stretch_seeing_eye.srv import GetWaypoints, GetWaypointsRequest, GetWaypointsResponse
 from stretch_seeing_eye.srv import CheckClear, CheckClearRequest, CheckClearResponse
+from stretch_seeing_eye.srv import FindFace, FindFaceRequest, FindFaceResponse
 from stretch_seeing_eye.srv import MakePath, MakePathRequest, MakePathResponse
 from stretch_seeing_eye.msg import WaypointDijkstra, Door as DoorMsg
 
@@ -32,6 +34,7 @@ class NavigateWaypoint:
         self.moving = False
         self.pause = False
         self.cancel = False
+        self.pickup = False
         self.max_vel = 0.3
         self.scaling_factor = 1.0
 
@@ -58,6 +61,8 @@ class NavigateWaypoint:
         self.stop_navigation_service = rospy.Service('/stretch_seeing_eye/stop_navigation', Trigger, self.stop_navigation_callback)
 
         self.check_door_service = rospy.ServiceProxy('/stretch_seeing_eye/detect_door_open', CheckClear)
+        self.create_path_service = rospy.ServiceProxy('/stretch_seeing_eye/create_path', GetPlan)
+        self.find_face_service = rospy.ServiceProxy('/stretch_seeing_eye/find_face', )
         self.get_path_service = rospy.ServiceProxy('/move_base/WaypointGlobalPlanner/waypoint_path', MakePath)
         self.client = client.Client('/move_base/TebLocalPlannerROS', timeout=30, config_callback=None)
         rospy.sleep(1)
@@ -69,6 +74,8 @@ class NavigateWaypoint:
             exit(1)
 
     def check_points(self):
+        if self.pickup: 
+            return
         try:
             transform: tf2_ros.TransformStamped = self.tfBuffer.lookup_transform('map', 'base_link', rospy.Time())
         except Exception as e:
@@ -240,6 +247,23 @@ class NavigateWaypoint:
         rospy.sleep(2)
         self.wait_for_move_base(index=res.points[0])
         rospy.logdebug('Rotate routine end')
+    
+    def dock_person_routine(self):
+        res_face: FindFaceResponse = self.find_face_service(FindFaceRequest())
+        if not res_face.success:
+            return
+        req_plan = GetPlanRequest()
+        req_plan.goal = self.tfBuffer.transform(res_face.point, 'map')
+        transform: tf2_ros.TransformStamped = self.tfBuffer.lookup_transform('base_link', 'map', rospy.Time())
+        
+        start = PoseStamped()
+        start.header.frame_id = 'map'
+        start.pose.position = transform.transform.translation
+        start.pose.orientation = transform.transform.rotation
+        req_plan.start = start
+
+        res_plan: GetPlanResponse = self.get_path_service(req_plan)
+        return
 
     def entrance_routine(self, goal: str):
         self.rotate_routine(self.goals[goal].entrance_pose)
@@ -250,6 +274,8 @@ class NavigateWaypoint:
         self.move_base_goal_pub.publish(self.goals[goal].entrance_pose)
         rospy.sleep(2)
         self.wait_for_move_base(index=self.adjacency_matrix['lookup_table'][self.goals[goal].id])
+        if self.pickup:
+            self.dock_person_routine()
         return
 
     def inside_routine(self, goal: str):
@@ -275,6 +301,8 @@ class NavigateWaypoint:
             self.move_base_goal_pub.publish(door.inside_pose)
             rospy.sleep(2)
             self.wait_for_move_base(index=self.adjacency_matrix['lookup_table'][door.id] + 1)
+            if self.pickup:
+                self.dock_person_routine()
         else:
             rospy.logdebug('Door closed')
             rospy.logdebug(res.message)
@@ -290,6 +318,8 @@ class NavigateWaypoint:
         self.move_base_goal_pub.publish(waypoint.poseStamped)
         rospy.sleep(2)
         self.wait_for_move_base(self.adjacency_matrix['lookup_table'][waypoint.id])
+        if self.pickup:
+            self.dock_person_routine()
         return
 
     def navigate_to_waypoint(self, msg: WaypointRequest):
@@ -300,6 +330,8 @@ class NavigateWaypoint:
         if goal not in self.goals.keys():
             rospy.logdebug('Goal unknown')
             return WaypointResponse()
+        
+        self.pickup = msg.pickup
 
         if 'Entrance' in goal:
             self.entrance_routine(goal)
