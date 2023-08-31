@@ -27,11 +27,14 @@ class FaceFinder():
 
         face_tracking_point_sub = rospy.Subscriber('/face_detector/people_tracker_measurements_array', PositionMeasurementArray, self.callback, queue_size=1)
 
+        req = SetJointsRequest([Joint(joint_name='joint_head_tilt', val=angle)])
+        self.move_joints(req)
+        
         angle = -4.0
         while not rospy.is_shutdown() and not self.found:
             req = SetJointsRequest([Joint(joint_name='joint_head_pan', val=angle)])
             self.move_joints(req)
-            rospy.sleep(0.1)
+            rospy.sleep(1)
             angle += 0.1
             if self.found or angle > 1.8:
                 break
