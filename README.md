@@ -25,7 +25,7 @@ rosrun map_server map_saver
 # On Robot
 roslaunch stretch_seeing_eye stretch_remote_bringup.launch
 roslaunch stretch_seeing_eye navigation.launch location:=dan rviz:=false
-roslaunch face_detector face_detector.rgbd.launch rgb_ns:=color image_topic:=image_raw depth_ns:=aligned_depth_to_color fixed_frame:=base_link depth_topic:=image_raw
+roslaunch face_detector face_detector.rgbd.launch rgb_ns:=color image_topic:=image_raw_rotated depth_ns:=aligned_depth_to_color fixed_frame:=base_link depth_topic:=image_raw_rotated
 roslaunch stretch_seeing_eye navigate_waypoints.launch location:=dan
 roslaunch rosbridge_server rosbridge_websocket.launch
 # On terminal
