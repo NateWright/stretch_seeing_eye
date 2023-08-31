@@ -26,10 +26,10 @@ class RotateCamera {
     explicit RotateCamera(ros::NodeHandlePtr nh) : nh_(nh) {
         tfListener_ = new tf2_ros::TransformListener(tfBuffer_);
 
-        depthSub_ = nh->subscribe("/camera/aligned_depth_to_color/image_raw", 10, RotateCamera::depth_callback, this);
-        imageSub_ = nh->subscribe("/camera/color/image_raw", 10, RotateCamera::image_callback, this);
-        depthInfoSub_ = nh->subscribe("/camera/aligned_depth_to_color/camera_info", 10, RotateCamera::depth_info_callback, this);
-        imageInfoSub_ = nh->subscribe("/camera/color/camera_info", 10, RotateCamera::image_info_callback, this);
+        depthSub_ = nh->subscribe("/camera/aligned_depth_to_color/image_raw", 10, &RotateCamera::depth_callback, this);
+        imageSub_ = nh->subscribe("/camera/color/image_raw", 10, &RotateCamera::image_callback, this);
+        depthInfoSub_ = nh->subscribe("/camera/aligned_depth_to_color/camera_info", 10, &RotateCamera::depth_info_callback, this);
+        imageInfoSub_ = nh->subscribe("/camera/color/camera_info", 10, &RotateCamera::image_info_callback, this);
 
         depthPub_ = nh->advertise<sensor_msgs::PointCloud2>("/camera/aligned_depth_to_color/image_raw_rotated", 10);
         imagePub_ = nh->advertise<sensor_msgs::Image>("/camera/color/image_raw_rotated", 10);
@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
     /* code */
     ros::init(argc, argv, "rotate_camera");
     ros::NodeHandlePtr nh(new ros::NodeHandle());
-    RotateCamera rotate_camera;
+    RotateCamera rotate_camera(nh);
     ros::spin();
     return 0;
 }
