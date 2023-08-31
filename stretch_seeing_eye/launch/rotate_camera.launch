@@ -1,7 +1,7 @@
 <launch>
     <node pkg="image_rotate" type="image_rotate" name="image_rotate">
 
-        <remap from="camera" to="/camera/color/image_raw"/>
+        <remap from="image" to="/camera/color/image_raw"/>
         <remap from="rotated/image" to="/camera/color/image_raw_rotated"/>
         <param name="target_z" type="double" value="-1" />
     </node>
