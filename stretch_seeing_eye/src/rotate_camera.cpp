@@ -44,15 +44,15 @@ class RotateCamera {
         depthPub_.publish(output);
     }
     void image_callback(sensor_msgs::Image::Ptr msg) {
-        auto output = tfBuffer_.transform(*msg, "base_link");
+        sensor_msgs::Image output = tfBuffer_.transform(*msg, "base_link");
         imagePub_.publish(output);
     }
     void depth_info_callback(sensor_msgs::CameraInfo::Ptr msg) {
-        auto output = tfBuffer_.transform(*msg, "base_link");
+        sensor_msgs::CameraInfo output = tfBuffer_.transform(*msg, "base_link");
         depthInfoPub_.publish(output);
     }
     void image_info_callback(sensor_msgs::CameraInfo::Ptr msg) {
-        auto output = tfBuffer_.transform(*msg, "base_link");
+        sensor_msgs::CameraInfo output = tfBuffer_.transform(*msg, "base_link");
         imageInfoPub_.publish(output);
     }
 };
