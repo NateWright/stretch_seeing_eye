@@ -10,4 +10,4 @@
         <!-- <remap from="rotated/image" to="/camera/aligned_depth_to_color/image_raw_rotated"/> -->
         <param name="target_z" type="double" value="-1" />
     </node>
-</launch>1
+</launch>
