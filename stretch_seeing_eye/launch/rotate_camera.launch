@@ -5,7 +5,8 @@
         <param name="target_z" type="double" value="-1" />
     </node>
     <node pkg="image_rotate" type="image_rotate" name="depth_rotate">
-        <param name="input_frame_id" type="str" value="/camera/aligned_depth_to_color/image_raw"/>
+        <arg name="image" value="/camera/aligned_depth_to_color/image_raw" />
+        <arg name="rotated/image" value="/camera/aligned_depth_to_color/image_raw_rotated" />
         <!-- <remap from="image" to="/camera/aligned_depth_to_color/image_raw"/> -->
         <!-- <remap from="rotated/image" to="/camera/aligned_depth_to_color/image_raw_rotated"/> -->
         <param name="target_z" type="double" value="-1" />
