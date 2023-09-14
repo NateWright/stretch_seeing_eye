@@ -9,6 +9,7 @@
   <node name="d435i_configure" pkg="stretch_core" type="d435i_configure" output="screen" >
       <param name="initial_mode" type="string" value="High Accuracy"/>
   </node>
+  <include file="$(find stretch_seeing_eye)/launch/rotate_camera.launch" />
   <!-- -->
   
   <!-- STRETCH DRIVER -->
