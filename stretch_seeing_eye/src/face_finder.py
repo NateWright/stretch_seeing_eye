@@ -49,7 +49,7 @@ class FaceFinder():
 
     def callback(self, arr: PositionMeasurementArray):
         for i, p in enumerate(arr.people):
-            if p.reliability < 0.95:
+            if p.reliability < 0.89:
                 rospy.logdebug('reliability too low')
                 continue
             self.found = True
