@@ -3,10 +3,10 @@
   <arg name="urdf_file" value="$(find stretch_description)/urdf/stretch.urdf"/>
   <arg name="controller_yaml_file" value="$(find stretch_core)/config/controller_calibration_head.yaml"/>
   <arg name="calibration_directory" value="$(env HELLO_FLEET_PATH)/$(env HELLO_FLEET_ID)/calibration_ros/"/>
-  
+  <arg name="cam" default="true" />
   <!-- REALSENSE D435i -->
-  <include file="$(find stretch_core)/launch/d435i_low_resolution.launch" />
-  <node name="d435i_configure" pkg="stretch_core" type="d435i_configure" output="screen" >
+  <include file="$(find stretch_core)/launch/d435i_low_resolution.launch" if="$(arg cam)" />
+  <node name="d435i_configure" pkg="stretch_core" type="d435i_configure" output="screen" if="$(arg cam)" >
       <param name="initial_mode" type="string" value="High Accuracy"/>
   </node>
   <!-- -->
@@ -19,7 +19,8 @@
   <!-- -->
   
   <!-- LASER RANGE FINDER -->
-  <include file="$(find stretch_seeing_eye)/launch/rplidar_mod.launch" />
+  <!-- <include file="$(find stretch_seeing_eye)/launch/rplidar_mod.launch" /> -->
+  <include file="$(find stretch_core)/launch/rplidar.launch" />
   <!-- -->
   
 </launch>
