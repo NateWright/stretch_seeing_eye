@@ -12,8 +12,12 @@
   </include>
 
   <!-- MAPPING -->
-  <node pkg="gmapping" type="slam_gmapping" name="gmapping_record_map" output="log" >
+  <!-- <node pkg="gmapping" type="slam_gmapping" name="gmapping_record_map" output="log" >
 	<remap from="/scan" to="/scan_filtered"/>
+  </node> -->
+  <!-- <node pkg="gmapping" type="slam_gmapping" name="gmapping_record_map" output="log" /> -->
+  <node pkg="slam_toolbox" type="sync_slam_toolbox_node" name="slam_toolbox" output="screen">
+    <rosparam command="load" file="$(find stretch_seeing_eye)/config/move_base/mapping.yaml" />
   </node>
 
   <!-- VISUALIZE -->
