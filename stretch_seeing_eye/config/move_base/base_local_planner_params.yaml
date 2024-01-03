@@ -75,5 +75,6 @@ TebLocalPlannerROS:
 
   min_obstacle_dist: 0.25
   min_turning_radius: 0.0
+  costmap_obstacles_behind_robot_dist: 0.01
 
   weight_kinematics_forward_drive: 1000
